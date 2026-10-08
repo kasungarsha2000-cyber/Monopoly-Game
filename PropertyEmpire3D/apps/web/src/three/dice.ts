@@ -6,8 +6,9 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { ease, type Tweens } from './tween';
 import { blobTexture } from './textures';
+import { DICE_TRAY } from './city';
 
-const SIZE = 0.5;
+const SIZE = 0.62;
 
 /** Material index (BoxGeometry face order +x,-x,+y,-y,+z,-z) -> pip value. */
 const FACE_VALUES = [3, 4, 1, 6, 2, 5];
@@ -56,40 +57,38 @@ const PIPS: Record<number, [number, number][]> = {
   ]
 };
 
-function faceTexture(value: number): THREE.CanvasTexture {
+interface DieStyle {
+  face: [string, string];
+  pip: [string, string];
+  one: [string, string];
+}
+
+const IVORY: DieStyle = { face: ['#FFFEFA', '#EFE8DA'], pip: ['#41546B', '#141E2A'], one: ['#F07070', '#B92F2F'] };
+const GREEN: DieStyle = { face: ['#2F7A5A', '#1F5A42'], pip: ['#FFF8E6', '#E9DDBE'], one: ['#FFE08A', '#E9B949'] };
+
+function faceTexture(value: number, style: DieStyle): THREE.CanvasTexture {
   const s = 256;
   const c = document.createElement('canvas');
   c.width = s;
   c.height = s;
   const ctx = c.getContext('2d') as CanvasRenderingContext2D;
-  // Ivory face with a faint vignette toward the rounded edges.
   const bg = ctx.createRadialGradient(s / 2, s / 2, s * 0.1, s / 2, s / 2, s * 0.75);
-  bg.addColorStop(0, '#FFFEFA');
-  bg.addColorStop(1, '#EFE8DA');
+  bg.addColorStop(0, style.face[0]);
+  bg.addColorStop(1, style.face[1]);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, s, s);
   for (const [x, y] of PIPS[value] ?? []) {
     const r = value === 1 ? 30 : 21;
     const px = x * s;
     const py = y * s;
-    // Engraved pip: dark core with a lighter lower rim.
+    const colors = value === 1 ? style.one : style.pip;
     const g = ctx.createRadialGradient(px - r * 0.25, py - r * 0.3, r * 0.1, px, py, r);
-    if (value === 1) {
-      g.addColorStop(0, '#F07070');
-      g.addColorStop(1, '#B92F2F');
-    } else {
-      g.addColorStop(0, '#41546B');
-      g.addColorStop(1, '#141E2A');
-    }
+    g.addColorStop(0, colors[0]);
+    g.addColorStop(1, colors[1]);
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(px, py, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(px, py, r + 1, Math.PI * 0.15, Math.PI * 0.85);
-    ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -101,13 +100,15 @@ export class Dice {
   readonly group = new THREE.Group();
   private dice: THREE.Mesh[] = [];
   private blobs: THREE.Mesh[] = [];
-  private rest: THREE.Vector3[] = [new THREE.Vector3(-0.42, SIZE / 2, 0.9), new THREE.Vector3(0.42, SIZE / 2, 0.9)];
+  // Resting on the felt dice tray (tray surface is at y = 0.115).
+  private rest: THREE.Vector3[] = [new THREE.Vector3(DICE_TRAY.x - 0.45, SIZE / 2 + 0.115, DICE_TRAY.z - 0.15), new THREE.Vector3(DICE_TRAY.x + 0.45, SIZE / 2 + 0.115, DICE_TRAY.z + 0.2)];
 
   constructor() {
     // Rounded cube; it keeps BoxGeometry's per-face material groups.
     const geo = new RoundedBoxGeometry(SIZE, SIZE, SIZE, 5, SIZE * 0.14);
-    const mats = FACE_VALUES.map((v) => new THREE.MeshPhysicalMaterial({ map: faceTexture(v), roughness: 0.32, clearcoat: 0.7, clearcoatRoughness: 0.2 }));
+    const styles = [IVORY, GREEN];
     for (let i = 0; i < 2; i++) {
+      const mats = FACE_VALUES.map((v) => new THREE.MeshPhysicalMaterial({ map: faceTexture(v, styles[i] as DieStyle), roughness: 0.32, clearcoat: 0.7, clearcoatRoughness: 0.2 }));
       const m = new THREE.Mesh(geo, mats);
       // Yaw is applied last so it never changes which face points up.
       m.rotation.order = 'YXZ';
@@ -140,8 +141,8 @@ export class Dice {
     this.dice.forEach((d, i) => {
       const b = this.blobs[i];
       if (!b) return;
-      b.position.set(d.position.x, 0.006, d.position.z);
-      const lift = Math.max(0, d.position.y - SIZE / 2);
+      b.position.set(d.position.x, 0.12, d.position.z);
+      const lift = Math.max(0, d.position.y - SIZE / 2 - 0.115);
       b.scale.setScalar(1 + lift * 0.6);
       (b.material as THREE.MeshBasicMaterial).opacity = Math.max(0.15, 1 - lift * 0.7);
     });
@@ -153,7 +154,7 @@ export class Dice {
       this.show(values);
       return;
     }
-    const starts = this.dice.map((_, i) => new THREE.Vector3((i === 0 ? -1 : 1) * 2.2, 1.2, 3.2));
+    const starts = this.dice.map((_, i) => new THREE.Vector3(DICE_TRAY.x + (i === 0 ? -0.9 : 0.6), 1.6, DICE_TRAY.z + 2.4));
     const spins = this.dice.map(() => [2 + Math.floor(Math.random() * 3), 1 + Math.floor(Math.random() * 2), 2 + Math.floor(Math.random() * 3)]);
     const finals = values.map((v, i) => {
       const r = TOP_ROTATION[v] ?? [0, 0, 0];
@@ -170,7 +171,7 @@ export class Dice {
           d.position.z = from.z + (to.z - from.z) * p;
           // Three decaying hops.
           const hop = Math.abs(Math.sin(t * Math.PI * 3)) * (1 - t) * 1.1;
-          d.position.y = SIZE / 2 + hop + (1 - p) * 0.4;
+          d.position.y = SIZE / 2 + 0.115 + hop + (1 - p) * 0.4;
           const left = 1 - ease.outQuad(t);
           const s = spins[i] as number[];
           const f = finals[i] as number[];

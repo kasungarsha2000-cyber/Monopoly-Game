@@ -29,6 +29,8 @@ export default defineConfig(({ mode }) => ({
     target: 'es2022',
     sourcemap: false,
     chunkSizeWarningLimit: 900,
+    // The standalone page must be one file, so its fonts are inlined as data URIs.
+    assetsInlineLimit: mode === 'standalone' ? 1_000_000 : 4096,
     copyPublicDir: mode !== 'standalone',
     rollupOptions: {
       output: mode === 'standalone' ? { inlineDynamicImports: true } : { manualChunks: { three: ['three'] } }

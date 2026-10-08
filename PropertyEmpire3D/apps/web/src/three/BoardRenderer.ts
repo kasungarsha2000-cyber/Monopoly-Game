@@ -14,7 +14,8 @@ import { Dice } from './dice';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { buildingMaterial, colorMaterial, hotelGeometry, houseGeometry, setMaterialQuality, tokenGeometry, tokenMaterial } from './meshes';
-import { backgroundTexture, blobTexture, woodTexture } from './textures';
+import { backgroundTexture, blobTexture } from './textures';
+import { buildCity } from './city';
 import type { GraphicsQuality } from '../settings';
 
 export interface RendererOptions {
@@ -133,8 +134,8 @@ export class BoardRenderer {
       }
     });
     pmrem.dispose();
-    this.scene.background = backgroundTexture('#F4ECDD', '#CDB894');
-    this.scene.fog = new THREE.Fog(0xd8c6a4, 34, 70);
+    // Light studio backdrop; the board casts a soft shadow onto an invisible floor.
+    this.scene.background = backgroundTexture('#F6F4EE', '#E4E0D4');
 
     // Lights: warm key light with shadows, cool soft fill, gentle sky bounce.
     this.scene.add(new THREE.HemisphereLight(0xfff6e8, 0x8a6f4a, 0.3));
@@ -154,36 +155,36 @@ export class BoardRenderer {
     fill.position.set(9, 7, -6);
     this.scene.add(fill);
 
-    // Wooden table.
-    const tableTex = woodTexture({ width: 1024, height: 1024, base: '#B88A5A', planks: 8, seed: 11 }, 3, 3);
-    const table = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.MeshStandardMaterial({ map: tableTex, roughness: 0.7, metalness: 0 }));
-    table.rotation.x = -Math.PI / 2;
-    table.position.y = -0.42;
-    table.receiveShadow = true;
-    this.scene.add(table);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.ShadowMaterial({ opacity: 0.16 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.45;
+    floor.receiveShadow = true;
+    this.scene.add(floor);
 
-    // Board: rounded walnut frame with a raised rim around the printed surface.
-    const woodFrameTex = woodTexture({ width: 1024, height: 256, base: '#6E4A2C', planks: 3, seed: 5, grain: 40 }, 2, 1);
-    const frameMat = new THREE.MeshStandardMaterial({ map: woodFrameTex, roughness: 0.5, metalness: 0 });
-    const base = new THREE.Mesh(new RoundedBoxGeometry(BOARD + 0.7, 0.42, BOARD + 0.7, 4, 0.12), frameMat);
-    base.position.y = -0.21;
+    // Board: cream rounded base with a slightly raised lip around the printed surface.
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0xefe6d1, roughness: 0.62 });
+    const base = new THREE.Mesh(new RoundedBoxGeometry(BOARD + 0.6, 0.44, BOARD + 0.6, 5, 0.16), baseMat);
+    base.position.y = -0.22;
     base.castShadow = true;
     base.receiveShadow = true;
     this.scene.add(base);
-    const rimGeoX = new RoundedBoxGeometry(BOARD + 0.7, 0.08, 0.3, 3, 0.03);
-    const rimGeoZ = new RoundedBoxGeometry(0.3, 0.08, BOARD + 0.1, 3, 0.03);
+    const lipMat = new THREE.MeshStandardMaterial({ color: 0xe2d5b8, roughness: 0.55 });
+    const lipX = new RoundedBoxGeometry(BOARD + 0.6, 0.06, 0.26, 3, 0.025);
+    const lipZ = new RoundedBoxGeometry(0.26, 0.06, BOARD + 0.08, 3, 0.025);
     for (const [geo, x, z] of [
-      [rimGeoX, 0, BOARD / 2 + 0.2],
-      [rimGeoX, 0, -BOARD / 2 - 0.2],
-      [rimGeoZ, BOARD / 2 + 0.2, 0],
-      [rimGeoZ, -BOARD / 2 - 0.2, 0]
+      [lipX, 0, BOARD / 2 + 0.17],
+      [lipX, 0, -BOARD / 2 - 0.17],
+      [lipZ, BOARD / 2 + 0.17, 0],
+      [lipZ, -BOARD / 2 - 0.17, 0]
     ] as [THREE.BufferGeometry, number, number][]) {
-      const rim = new THREE.Mesh(geo, frameMat);
-      rim.position.set(x, 0.0, z);
-      rim.castShadow = true;
-      rim.receiveShadow = true;
-      this.scene.add(rim);
+      const lip = new THREE.Mesh(geo, lipMat);
+      lip.position.set(x, 0.0, z);
+      lip.castShadow = true;
+      lip.receiveShadow = true;
+      this.scene.add(lip);
     }
+    // The city centerpiece (buildings, trees, plaque, dice tray, card decks).
+    this.scene.add(buildCity(opts.quality !== 'low'));
     this.boardMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, metalness: 0 });
     const top = new THREE.Mesh(new THREE.PlaneGeometry(BOARD, BOARD), this.boardMaterial);
     top.rotation.x = -Math.PI / 2;
@@ -297,7 +298,8 @@ export class BoardRenderer {
     this.invalidate();
   }
 
-  setInsets(insets: Insets, defaultPolar = 0.82): void {
+  setInsets(insets: Insets, defaultPolar = 0.82, defaultAzimuth = -0.28): void {
+    this.rig.defaultAzimuth = defaultAzimuth;
     this.rig.setDefaultPolar(defaultPolar);
     this.rig.setInsets(insets);
     this.invalidate();

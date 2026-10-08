@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/figtree": "5.2.10",
+    "@fontsource-variable/outfit": "5.2.8",
     "@pe/game-core": "1.0.0",
     "three": "0.180.0"
   }

@@ -1,17 +1,21 @@
 /**
- * Game screen: HUD, context-sensitive controls and the event player that
- * turns authoritative game events into animations before revealing the new
- * state. Works identically for solo (LocalSession) and LAN (RemoteSession).
+ * Game screen: header with player cards, "Your empire" panel, the framed 3D
+ * board with its action dock, and the title-deed panel. The event player turns
+ * authoritative game events into animations before revealing the new state.
+ * Works identically for solo (LocalSession) and LAN (RemoteSession).
  */
 import {
   auctionMinBid,
+  computeRent,
   currentBidder,
   describeTrade,
   findCard,
   getLegalActions,
   getSpace,
+  groupSpaces,
   netWorth,
   ownedSpaces,
+  ownsWholeGroup,
   pendingActors,
   rankPlayers,
   type Action,
@@ -25,8 +29,10 @@ import type { LanClient } from '../session/LanClient';
 import { settings } from '../settings';
 import { audio } from '../audio';
 import { button, clear, closeTopModal, confirmDialog, h, hasOpenModal, modal, toast, type ModalHandle } from '../ui/dom';
-import { money, tokenIcon } from '../ui/format';
-import { propertyCard } from '../ui/propertyCard';
+import { money, plural, tokenIcon } from '../ui/format';
+import { icon } from '../ui/icons';
+import { propertyThumb, tint } from '../ui/art';
+import { buildingLabel, deedView, spaceColor } from '../ui/deed';
 import { ManageDialog } from '../ui/manageDialog';
 import { openTradeDialog } from '../ui/tradeDialog';
 import { settingsForm } from './settingsScreen';
@@ -68,18 +74,33 @@ class GameView {
   private readonly ctx;
   private readonly me: string;
   private bidValue = 0;
+  /** Space the player picked on the board or in a list. */
+  private pinned: number | null = null;
+  /** Where the last token landed; shown when nothing is pinned. */
+  private focusSpace: number;
+  private highlightMine = false;
+  private collapsed = new Set<string>();
 
   // DOM
-  private hud = h('div', { class: 'hud', 'data-testid': 'game-hud' });
-  private banner = h('div', { class: 'turn-banner', 'data-testid': 'turn-banner' });
-  private roundPill = h('span', { class: 'round-pill' });
-  private players = h('div', { class: 'players-panel', 'aria-label': 'Players' });
-  private panel = h('div', { class: 'action-panel', 'data-testid': 'action-panel', 'aria-live': 'polite' });
+  private shell = h('div', { class: 'game-shell', 'data-testid': 'game-hud' });
+  private turnMeta = h('div', { class: 'turn-meta' });
+  private turnWho = h('h1', { class: 'turn-who', 'data-testid': 'turn-banner' });
+  private turnSub = h('div', { class: 'turn-sub' });
+  private players = h('div', { class: 'pcards', role: 'list', 'aria-label': 'Players' });
+  private eventText = h('span', { class: 'event-text' });
+  private empireStats = h('div', { class: 'empire-stats' });
+  private empireCount = h('span', { class: 'count-badge', 'aria-label': 'Properties owned' });
+  private empireGroups = h('div', { class: 'empire-groups' });
+  private highlightBtn: HTMLButtonElement;
+  private boardCard = h('section', { class: 'board-card', 'aria-label': 'Game board' });
+  private dockCard = h('div', { class: 'dock-card', 'data-testid': 'action-panel', 'aria-live': 'polite' });
+  private deedPanel = h('aside', { class: 'deed-panel', 'data-testid': 'deed-panel', 'aria-label': 'Title deed' });
   private connBanner: HTMLElement | null = null;
   private btnRoll: HTMLButtonElement;
   private btnEnd: HTMLButtonElement;
   private btnProps: HTMLButtonElement;
   private btnTrade: HTMLButtonElement;
+  private btnSave: HTMLButtonElement;
 
   constructor(
     private readonly app: App,
@@ -90,24 +111,100 @@ class GameView {
     this.me = session.localPlayerId;
     this.display = session.state;
     this.lastTurnPlayer = this.display.turn.playerId;
+    this.focusSpace = this.player(this.me)?.position ?? 0;
+    const isLan = session.kind === 'lan';
 
-    const menuBtn = button('Menu', () => this.openMenu(), { variant: 'ghost', small: true, testid: 'open-menu', ariaLabel: 'Game menu' });
-    const topbar = h('div', { class: 'topbar' }, this.banner, this.roundPill, menuBtn);
-    this.btnRoll = button('Roll Dice', () => this.act({ type: 'ROLL' }), { variant: 'primary', kbd: 'Space', short: 'Roll', testid: 'btn-roll' });
-    this.btnEnd = button('End Turn', () => this.act({ type: 'END_TURN' }), { kbd: 'E', short: 'End', testid: 'btn-end-turn' });
-    this.btnProps = button('Properties', () => this.openManage(), { kbd: 'P', short: 'Props', testid: 'btn-properties' });
-    this.btnTrade = button('Trade', () => this.openTrade(), { kbd: 'T', short: 'Trade', testid: 'btn-trade' });
-    const btnLog = button('Log', () => this.openLog(), { variant: 'ghost', short: 'Log', testid: 'btn-log' });
-    const bottom = h('div', { class: 'bottombar', role: 'toolbar', 'aria-label': 'Game actions' }, this.btnRoll, this.btnEnd, this.btnProps, this.btnTrade, btnLog);
-    const cam = h(
-      'div',
-      { class: 'camera-controls', role: 'group', 'aria-label': 'Camera' },
-      button('+', () => app.renderer?.zoomBy(0.85), { ariaLabel: 'Zoom in' }),
-      button('−', () => app.renderer?.zoomBy(1.18), { ariaLabel: 'Zoom out' }),
-      button('⟲', () => void app.renderer?.resetCamera(this.ms(500)), { ariaLabel: 'Reset camera', testid: 'camera-reset' })
+    /* Header: turn title, player cards, latest event. */
+    const iconBtn = (name: Parameters<typeof icon>[0], label: string, fn: () => void, testid?: string) => {
+      const b = h('button', { type: 'button', class: 'icon-btn', 'aria-label': label, title: label, 'data-testid': testid }, icon(name, 18));
+      b.addEventListener('click', () => {
+        audio.unlock();
+        audio.play('click');
+        fn();
+      });
+      return b;
+    };
+    const eventLine = h('button', { type: 'button', class: 'event-line', 'data-testid': 'btn-log', 'aria-label': 'Open the game log' }, h('span', { class: 'event-icon' }, icon('dice', 18)), this.eventText, h('span', { class: 'event-more' }, 'Game log', icon('chevron', 14)));
+    eventLine.addEventListener('click', () => this.openLog());
+    const header = h(
+      'header',
+      { class: 'gs-header' },
+      h(
+        'div',
+        { class: 'gs-head-row' },
+        h('div', { class: 'turn-title' }, this.turnMeta, this.turnWho, this.turnSub),
+        this.players,
+        h('div', { class: 'head-tools' }, iconBtn('sliders', 'Settings', () => this.openSettings()), iconBtn('help', 'How to play', () => this.openHowTo()))
+      ),
+      eventLine
     );
-    this.hud.append(topbar, this.players, this.panel, cam, bottom);
-    app.root.append(this.hud);
+
+    /* Left: your empire. */
+    this.highlightBtn = h('button', { type: 'button', class: 'toggle-btn', 'aria-pressed': 'false', 'data-testid': 'highlight-mine' }, h('span', { class: 'toggle-box' }, icon('check', 12)), 'Highlight mine on board');
+    this.highlightBtn.addEventListener('click', () => {
+      audio.play('click');
+      this.highlightMine = !this.highlightMine;
+      this.applyHighlights();
+    });
+    const browse = h('button', { type: 'button', class: 'link-btn', 'data-testid': 'browse-deeds' }, 'Browse all title deeds');
+    browse.addEventListener('click', () => this.openAllDeeds());
+    const empire = h(
+      'aside',
+      { class: 'empire-card', 'aria-label': 'Your properties' },
+      h('div', { class: 'empire-head' }, h('div', {}, h('div', { class: 'eyebrow' }, 'Your empire'), h('h2', {}, 'Your properties')), this.empireCount),
+      this.empireStats,
+      this.highlightBtn,
+      this.empireGroups,
+      h('div', { class: 'empire-foot' }, browse)
+    );
+
+    this.btnProps = button('Properties', () => this.openManage(), { testid: 'btn-properties', icon: icon('list'), short: 'Props' });
+    this.btnTrade = button('Trade', () => this.openTrade(), { variant: 'primary', testid: 'btn-trade', icon: icon('trade') });
+    this.btnSave = button(
+      'Save game',
+      () => void this.session.save().then((msg) => toast(msg, /Could not|Only/.test(msg) ? 'bad' : 'good')),
+      { testid: 'btn-save', icon: icon('save'), short: 'Save', disabled: isLan && !session.isHost }
+    );
+    const btnMenu = button('Game menu', () => this.openMenu(), { testid: 'open-menu', icon: icon('pause'), short: 'Menu' });
+    const actions = h(
+      'div',
+      { class: 'gs-actions', role: 'toolbar', 'aria-label': 'Game actions' },
+      h('div', { class: 'action-grid' }, this.btnProps, this.btnTrade, this.btnSave, btnMenu),
+      h('p', { class: 'action-hint' }, 'Trade properties, cash or jail cards.')
+    );
+
+    /* Center: the board with its overlays. */
+    this.btnRoll = button('Roll dice', () => this.act({ type: 'ROLL' }), { variant: 'primary', testid: 'btn-roll', icon: icon('dice'), title: 'Roll dice (Space)' });
+    this.btnEnd = button('End turn', () => this.act({ type: 'END_TURN' }), { testid: 'btn-end-turn', title: 'End turn (E)' });
+    const coarse = window.matchMedia?.('(pointer: coarse)').matches;
+    const tool = (name: Parameters<typeof icon>[0], label: string, fn: () => void, testid?: string) => iconBtn(name, label, fn, testid);
+    this.boardCard.append(
+      h('div', { class: 'board-hint' }, coarse ? 'Drag to rotate · Pinch to zoom' : 'Drag to rotate · Scroll or pinch to zoom'),
+      h(
+        'div',
+        { class: 'board-tools', role: 'group', 'aria-label': 'Camera' },
+        tool('plus', 'Zoom in', () => app.renderer?.zoomBy(0.85)),
+        tool('minus', 'Zoom out', () => app.renderer?.zoomBy(1.18)),
+        tool('reset', 'Reset camera', () => void app.renderer?.resetCamera(this.ms(500)), 'camera-reset')
+      ),
+      h('div', { class: 'board-dock' }, this.dockCard, h('div', { class: 'dock-buttons' }, this.btnRoll, this.btnEnd))
+    );
+
+    const footer = h(
+      'footer',
+      { class: 'gs-footer' },
+      h('span', {}, 'Made for game night.'),
+      h('span', { class: 'keys' }, 'Space roll · E end turn · P properties · T trade · L log'),
+      h('span', {}, isLan ? (session.isHost ? 'Saved on this computer while you host.' : 'Saved by the host.') : 'Saved automatically in this browser.')
+    );
+
+    this.shell.append(header, empire, actions, this.boardCard, this.deedPanel, footer);
+    const myColor = this.player(this.me)?.color;
+    if (myColor && /^#[0-9a-f]{3,8}$/i.test(myColor)) this.shell.style.setProperty('--me', myColor);
+    app.root.append(this.shell);
+    // The shared 3D canvas moves into the board card for the length of the game.
+    app.stage.classList.add('in-board');
+    this.boardCard.prepend(app.stage);
 
     const r = app.ensureRenderer();
     if (r) {
@@ -116,9 +213,11 @@ class GameView {
       r.setHighlights([]);
       r.syncState(this.display);
       r.dice.show(this.display.turn.dice ?? [5, 2]);
-      void r.resetCamera(0);
       this.applyInsets();
+      void r.resetCamera(0);
       r.setTileClickHandler((i) => this.inspect(i));
+    } else {
+      this.boardCard.append(h('div', { class: 'board-error' }, h('h3', {}, '3D board unavailable'), h('p', {}, app.rendererError ?? 'WebGL is not available in this browser.')));
     }
 
     this.offs.push(
@@ -142,9 +241,10 @@ class GameView {
     const onKey = (e: KeyboardEvent) => this.onKey(e);
     window.addEventListener('keydown', onKey);
     this.offs.push(() => window.removeEventListener('keydown', onKey));
-    const onResize = () => this.applyInsets();
-    window.addEventListener('resize', onResize);
-    this.offs.push(() => window.removeEventListener('resize', onResize));
+    const ro = new ResizeObserver(() => this.applyInsets());
+    ro.observe(this.boardCard);
+    ro.observe(header);
+    this.offs.push(() => ro.disconnect());
 
     if (app.e2e) {
       (window as unknown as Record<string, unknown>).__pe = {
@@ -173,6 +273,11 @@ class GameView {
     this.app.renderer?.setHighlights([]);
     this.app.renderer?.setSelected(null);
     this.app.renderer?.setTileClickHandler(undefined);
+    this.app.renderer?.setInsets({ left: 0, right: 0, top: 0, bottom: 0 });
+    // Give the canvas back to the full-screen menu background.
+    this.app.stage.classList.remove('in-board');
+    this.app.root.parentElement?.insertBefore(this.app.stage, this.app.root);
+    document.documentElement.style.removeProperty('--toast-top');
     if (this.app.e2e) delete (window as unknown as Record<string, unknown>).__pe;
   }
 
@@ -202,21 +307,25 @@ class GameView {
     this.session.dispatch(action);
   }
 
-  private applyInsets(): void {
-    const r = this.app.renderer;
-    if (!r) return;
+  private isPhoneLayout(): boolean {
     const w = window.innerWidth;
     const hgt = window.innerHeight;
-    const mobile = w <= 720 || (hgt <= 520 && w <= 1000);
-    if (mobile) {
-      const landscape = hgt <= 520;
-      // Portrait: players strip on top; bottom bar plus the (compact) bottom sheet below.
-      // A more top-down tilt lets the board fill the phone's width.
-      if (landscape) r.setInsets({ left: 0, right: 290, top: 50, bottom: 70 }, 0.82);
-      else r.setInsets({ left: 0, right: 0, top: 112, bottom: Math.min(Math.round(hgt * 0.26), 180) + 84 }, 0.5);
-    } else {
-      r.setInsets({ left: w > 900 ? 255 : 215, right: w > 900 ? 320 : 290, top: 60, bottom: 80 }, 0.82);
-    }
+    return w <= 720 || (hgt <= 560 && w <= 1000);
+  }
+
+  /** Keep the board centred in the visible part of the board card (above the dock). */
+  private applyInsets(): void {
+    const r = this.app.renderer;
+    const rect = this.boardCard.getBoundingClientRect();
+    document.documentElement.style.setProperty('--toast-top', `${Math.round(rect.top + 56)}px`);
+    if (!r) return;
+    const phone = this.isPhoneLayout();
+    const portrait = rect.height > rect.width * 1.15;
+    const dock = this.boardCard.querySelector<HTMLElement>('.dock-buttons')?.offsetHeight ?? 52;
+    // Tall phone screens: look more from above, square-on, so the board fills the width.
+    if (phone && portrait) r.setInsets({ left: 0, right: 0, top: 4, bottom: dock + 12 }, 0.42, 0);
+    else if (phone) r.setInsets({ left: 0, right: 0, top: 0, bottom: dock + 6 }, 0.8);
+    else r.setInsets({ left: 0, right: 0, top: 24, bottom: dock + 20 }, 0.8);
   }
 
   private setConnection(text: string | null): void {
@@ -224,7 +333,7 @@ class GameView {
     this.connBanner = null;
     if (!text) return;
     this.connBanner = h('div', { class: 'connection-banner', role: 'status', 'data-testid': 'connection-banner' }, h('div', { class: 'spinner small' }), text);
-    this.hud.append(this.connBanner);
+    this.boardCard.append(this.connBanner);
   }
 
   /* ------------------------------------------------------------------ */
@@ -270,9 +379,9 @@ class GameView {
     switch (e.type) {
       case 'TURN_STARTED':
         if (e.playerId !== this.lastTurnPlayer || e.playerId === this.me) {
-          this.banner.classList.remove('flash');
-          void this.banner.offsetWidth;
-          this.banner.classList.add('flash');
+          this.turnWho.classList.remove('flash');
+          void this.turnWho.offsetWidth;
+          this.turnWho.classList.add('flash');
         }
         this.lastTurnPlayer = e.playerId;
         if (e.playerId === this.me) {
@@ -282,13 +391,14 @@ class GameView {
         break;
       case 'DICE_ROLLED':
         audio.play('dice');
-        this.setBannerDice(e.dice);
+        this.eventText.textContent = `${this.nameOf(e.playerId)} ${e.playerId === this.me ? 'roll' : 'rolls'} ${e.dice[0]} + ${e.dice[1]}${e.doubles ? ' (doubles)' : ''}.`;
         await r?.rollDice(e.dice, this.ms(1200));
         if (e.doubles && !e.inJail) toast(`${this.nameOf(e.playerId)} rolled doubles!`, '', 1600);
         break;
       case 'MOVED': {
         const jail = this.ctx.board.spaces.findIndex((s) => s.type === 'jail');
         await r?.animateMove(e.playerId, e.from, e.to, e.steps, e.direct, this.ms(170), e.direct && e.to === jail, () => audio.play('step'));
+        this.focusSpace = e.to;
         break;
       }
       case 'MONEY':
@@ -314,7 +424,7 @@ class GameView {
         audio.play('buy');
         r?.syncOwnership(next);
         if (this.ms(1) > 0) r?.burst(e.space, color(e.playerId));
-        toast(`${this.nameOf(e.playerId)} ${e.type === 'AUCTION_WON' ? 'won' : e.playerId === this.me ? 'bought' : 'bought'} ${getSpace(this.ctx, e.space).name} for ${money(e.type === 'AUCTION_WON' ? e.amount : e.price)}`, e.playerId === this.me ? 'good' : '');
+        toast(`${this.nameOf(e.playerId)} ${e.type === 'AUCTION_WON' ? 'won' : 'bought'} ${getSpace(this.ctx, e.space).name} for ${money(e.type === 'AUCTION_WON' ? e.amount : e.price)}`, e.playerId === this.me ? 'good' : '');
         await wait(this.ms(350));
         break;
       case 'AUCTION_STARTED':
@@ -378,12 +488,14 @@ class GameView {
       case 'TRADE_CANCELLED':
         toast('Trade offer withdrawn');
         break;
-      case 'BANKRUPT':
+      case 'BANKRUPT': {
         audio.play('bankrupt');
-        this.hud.append(h('div', { class: 'overlay-banner', role: 'status' }, `${this.nameOf(e.playerId)} ${e.playerId === this.me ? 'are' : 'is'} bankrupt!`));
-        window.setTimeout(() => this.hud.querySelector('.overlay-banner')?.remove(), 2800);
+        const banner = h('div', { class: 'overlay-banner', role: 'status' }, `${this.nameOf(e.playerId)} ${e.playerId === this.me ? 'are' : 'is'} bankrupt!`);
+        this.boardCard.append(banner);
+        window.setTimeout(() => banner.remove(), 2800);
         await wait(this.ms(600));
         break;
+      }
       case 'GAME_OVER':
         if (e.winnerId === this.me) audio.play('win');
         break;
@@ -392,18 +504,12 @@ class GameView {
     }
   }
 
-  private setBannerDice(dice: [number, number]): void {
-    const existing = this.banner.querySelector('.dice-readout');
-    existing?.remove();
-    this.banner.append(h('span', { class: 'dice-readout', 'aria-label': `Rolled ${dice[0]} and ${dice[1]}` }, h('span', { class: 'die-face' }, dice[0]), h('span', { class: 'die-face' }, dice[1])));
-  }
-
   private floatMoney(party: string, amount: number): void {
     if (party === 'bank') return;
-    const row = this.players.querySelector<HTMLElement>(`[data-player="${CSS.escape(party)}"]`);
-    if (!row) return;
+    const card = this.players.querySelector<HTMLElement>(`[data-player="${CSS.escape(party)}"]`);
+    if (!card) return;
     const f = h('span', { class: `money-float ${amount >= 0 ? 'plus' : 'minus'}` }, `${amount >= 0 ? '+' : '−'}${money(Math.abs(amount))}`);
-    row.append(f);
+    card.append(f);
     window.setTimeout(() => f.remove(), 1500);
   }
 
@@ -413,11 +519,12 @@ class GameView {
     const popup = h(
       'div',
       { class: `card-popup ${deck}`, role: 'dialog', 'aria-label': 'Card drawn', 'data-testid': 'card-popup' },
+      h('div', { class: 'card-mark', 'aria-hidden': 'true' }, deck === 'chance' ? '?' : '♥'),
       h('div', { class: 'deck' }, `${deck === 'chance' ? 'Fortune' : 'Community Fund'} · ${this.nameOf(playerId)}`),
       h('h3', {}, found.card.title),
       h('p', {}, found.card.text)
     );
-    this.hud.append(popup);
+    this.boardCard.append(popup);
     const hold = this.ms(2000);
     return new Promise((resolve) => {
       let done = false;
@@ -445,36 +552,23 @@ class GameView {
   }
 
   /* ------------------------------------------------------------------ */
-  /* HUD rendering                                                        */
+  /* Rendering                                                            */
   /* ------------------------------------------------------------------ */
 
   private render(): void {
     const st = this.display;
     const legal = this.playing ? null : getLegalActions(st, this.me, this.ctx);
-    this.renderBanner(st);
+    this.renderHeader(st);
     this.renderPlayers(st);
-    this.renderPanel(st, legal);
+    this.renderEmpire(st);
+    // While events play out, keep the current dock content instead of flashing it away.
+    if (!this.playing || this.dockCard.hidden) this.renderDock(st, legal);
+    this.renderDeed(st, legal);
     this.btnRoll.disabled = !legal?.canRoll;
     this.btnEnd.disabled = !legal?.canEndTurn;
     this.btnTrade.disabled = !legal?.canProposeTrade;
     this.btnProps.disabled = false;
-  }
-
-  private renderBanner(st: GameState): void {
-    const dice = this.banner.querySelector('.dice-readout');
-    clear(this.banner);
-    const cur = this.player(st.turn.playerId);
-    if (cur) this.banner.append(tokenIcon(cur.token, cur.color, 22));
-    let what = PHASE_TEXT[st.phase] ?? '';
-    if (st.phase === 'AWAIT_ROLL' && st.turn.extraRoll) what = 'Doubles! Roll again';
-    if (st.phase === 'AUCTION' && st.auction) what = `Auction: ${getSpace(this.ctx, st.auction.space).shortName}`;
-    if (st.phase === 'DEBT_RESOLUTION' && st.debts[0]) what = `${this.nameOf(st.debts[0].debtorId)} must raise ${money(st.debts[0].amount)}`;
-    if (st.phase === 'GAME_OVER') what = st.winnerId ? `${this.nameOf(st.winnerId)} ${st.winnerId === this.me ? 'win' : 'wins'}!` : 'Game over';
-    const who = st.phase === 'GAME_OVER' ? 'Game over' : cur?.id === this.me ? 'Your turn' : `${cur?.name ?? ''}’s turn`;
-    this.banner.append(h('span', { class: 'who' }, who), h('span', { class: 'what' }, `· ${what}`));
-    if (dice) this.banner.append(dice);
-    else if (st.turn.dice) this.setBannerDice(st.turn.dice);
-    this.roundPill.textContent = `Round ${this.roundOf(st)}${st.config.maxRounds ? ` / ${st.config.maxRounds}` : ''}`;
+    if (!this.manage) this.applyHighlights();
   }
 
   /** Rounds played, capped at the limit (the counter passes it when a round-limited game ends). */
@@ -482,72 +576,173 @@ class GameView {
     return st.config.maxRounds ? Math.min(st.round, st.config.maxRounds) : st.round;
   }
 
+  private renderHeader(st: GameState): void {
+    const cur = this.player(st.turn.playerId);
+    this.turnMeta.textContent = `Turn ${Math.max(1, st.turn.number)} · Round ${this.roundOf(st)}${st.config.maxRounds ? ` of ${st.config.maxRounds}` : ''}`;
+    this.turnWho.textContent = st.phase === 'GAME_OVER' ? 'Game over' : cur?.id === this.me ? 'Your turn' : `${cur?.name ?? ''}’s turn`;
+    let what = PHASE_TEXT[st.phase] ?? '';
+    if (st.phase === 'AWAIT_ROLL' && st.turn.extraRoll) what = 'Doubles! Roll again';
+    if (st.phase === 'AUCTION' && st.auction) what = `Auction: ${getSpace(this.ctx, st.auction.space).shortName}`;
+    if (st.phase === 'DEBT_RESOLUTION' && st.debts[0]) what = `${this.nameOf(st.debts[0].debtorId)} must raise ${money(st.debts[0].amount)}`;
+    if (st.phase === 'GAME_OVER') what = st.winnerId ? `${this.nameOf(st.winnerId)} ${st.winnerId === this.me ? 'win' : 'wins'}!` : 'Game over';
+    const mode = this.session.kind === 'lan' ? 'LAN game' : 'Solo with bots';
+    this.turnSub.textContent = `${mode} · ${what}`;
+    // Latest real happening; "Turn 12: Ada's turn." headers are already shown above.
+    let last = st.log[st.log.length - 1];
+    for (let i = st.log.length - 1; i >= Math.max(0, st.log.length - 4); i--) {
+      const entry = st.log[i];
+      if (entry && !/^Turn \d+:/.test(entry.text)) {
+        last = entry;
+        break;
+      }
+    }
+    if (!this.playing || !this.eventText.textContent) this.eventText.textContent = last?.text ?? 'The game begins. Good luck!';
+  }
+
   private renderPlayers(st: GameState): void {
     clear(this.players);
-    this.players.append(h('div', { class: 'panel-title' }, 'Players', st.config.freeParkingJackpot ? h('span', {}, `Pot ${money(st.freeParkingPot)}`) : null));
     const actors = new Set(pendingActors(st));
     for (const p of st.players) {
-      const props = ownedSpaces(st, p.id).length;
-      const badges = [
-        p.kind === 'bot' ? h('span', { class: 'badge' }, `Bot · ${p.difficulty}`) : p.id === this.me ? h('span', { class: 'badge blue' }, 'You') : null,
-        p.inJail ? h('span', { class: 'badge orange' }, 'In Jail') : null,
-        p.jailCards.length ? h('span', { class: 'badge' }, `${p.jailCards.length} jail card`) : null,
-        !p.connected && p.kind === 'human' ? h('span', { class: 'badge red' }, 'Offline') : null,
-        p.bankrupt ? h('span', { class: 'badge red' }, 'Bankrupt') : h('span', { class: 'badge' }, `${props} prop${props === 1 ? '' : 's'}`)
-      ];
-      const row = h(
+      const deeds = ownedSpaces(st, p.id).length;
+      const role = p.kind === 'bot' ? `${p.difficulty ?? ''} bot`.trim() : p.id === this.me ? 'You' : 'Player';
+      const notes = [p.bankrupt ? 'Bankrupt' : null, p.inJail ? 'In Jail' : null, !p.connected && p.kind === 'human' ? 'Offline' : null, p.jailCards.length ? `${p.jailCards.length} jail card` : null].filter(Boolean);
+      const active = st.turn.playerId === p.id && st.phase !== 'GAME_OVER';
+      const card = h(
         'button',
         {
           type: 'button',
-          class: `player-row ${st.turn.playerId === p.id && st.phase !== 'GAME_OVER' ? 'active' : ''} ${p.bankrupt ? 'bankrupt' : ''}`,
+          role: 'listitem',
+          class: `pcard ${active ? 'active' : ''} ${p.bankrupt ? 'bankrupt' : ''} ${actors.has(p.id) ? 'acting' : ''}`,
+          style: `--pc:${p.color};--pc-soft:${tint(p.color, 0.82)}`,
           'data-player': p.id,
-          'aria-label': `${p.name}, ${money(p.cash)}${actors.has(p.id) ? ', acting now' : ''}`
+          'aria-label': `${p.name}, ${money(p.cash)}, ${plural(deeds, 'deed')}${actors.has(p.id) ? ', acting now' : ''}`
         },
-        tokenIcon(p.token, p.color, 26),
-        h('div', { class: 'info' }, h('div', { class: 'row between nowrap' }, h('span', { class: 'pname' }, p.name), h('span', { class: 'cash' }, money(p.cash))), h('div', { class: 'details' }, ...badges))
+        h('span', { class: 'pcard-icon' }, tokenIcon(p.token, '#ffffff', 20)),
+        h('span', { class: 'pcard-main' }, h('span', { class: 'pname' }, p.name), h('span', { class: 'psub' }, [role, ...notes].join(' · '))),
+        h('span', { class: 'pcard-side' }, h('span', { class: 'cash' }, money(p.cash)), h('span', { class: 'deeds' }, plural(deeds, 'deed')))
       );
-      row.addEventListener('click', () => this.openManage(p.id));
-      this.players.append(row);
+      card.addEventListener('click', () => this.openManage(p.id));
+      this.players.append(card);
     }
+  }
+
+  private renderEmpire(st: GameState): void {
+    const meP = this.player(this.me);
+    const mine = ownedSpaces(st, this.me);
+    this.empireCount.textContent = String(mine.length);
+    clear(this.empireStats);
+    this.empireStats.append(
+      h('div', {}, h('span', { class: 'label' }, 'Your cash'), h('span', { class: 'value' }, money(meP?.cash ?? 0))),
+      h('div', {}, h('span', { class: 'label' }, 'Total net worth'), h('span', { class: 'value' }, money(meP ? netWorth(st, this.ctx, this.me) : 0)))
+    );
+    const scroll = this.empireGroups.scrollTop;
+    clear(this.empireGroups);
+    if (!mine.length) {
+      this.empireGroups.append(h('div', { class: 'empire-empty' }, h('div', { class: 'empty-art', 'aria-hidden': 'true' }, icon('house', 26)), h('p', {}, 'No properties yet.'), h('p', { class: 'muted' }, 'Land on a free space and buy it to start your empire.')));
+      return;
+    }
+    const dice = st.turn.dice ? st.turn.dice[0] + st.turn.dice[1] : 7;
+    for (const g of this.ctx.board.groups) {
+      const members = groupSpaces(this.ctx, g.id);
+      const owned = members.filter((i) => st.properties[i]?.owner === this.me);
+      if (!owned.length) continue;
+      const open = !this.collapsed.has(g.id);
+      const full = owned.length === members.length;
+      const head = h(
+        'button',
+        { type: 'button', class: 'egroup-head', 'aria-expanded': String(open) },
+        h('i', { class: 'gbar', style: `background:${g.color}` }),
+        h('span', { class: 'gname' }, g.name),
+        full ? h('span', { class: 'gfull', title: 'Complete set' }, icon('check', 12)) : null,
+        h('span', { class: 'gcount' }, `${owned.length}/${members.length}`),
+        icon('chevron', 14)
+      );
+      head.addEventListener('click', () => {
+        if (this.collapsed.has(g.id)) this.collapsed.delete(g.id);
+        else this.collapsed.add(g.id);
+        this.renderEmpire(this.display);
+      });
+      const rows = h('div', { class: 'egroup-rows' });
+      if (open) {
+        for (const i of owned) {
+          const s = getSpace(this.ctx, i);
+          const prop = st.properties[i];
+          const houses = prop?.houses ?? 0;
+          let status = s.type === 'transport' ? 'Transit' : s.type === 'utility' ? 'Utility' : houses > 0 ? buildingLabel(houses) : s.group && ownsWholeGroup(st, this.ctx, this.me, s.group) ? 'Full set · rent doubled' : 'No buildings';
+          if (prop?.mortgaged) status = 'Mortgaged';
+          const rent = prop?.mortgaged ? '—' : s.type === 'utility' ? `${s.rent?.[full ? 1 : 0] ?? 0}× dice` : money(computeRent(st, this.ctx, i, dice));
+          const row = h(
+            'button',
+            { type: 'button', class: `erow ${prop?.mortgaged ? 'mortgaged' : ''} ${this.deedIndex(st) === i ? 'selected' : ''}`, 'data-space': i, 'aria-label': `${s.name}, ${status}` },
+            propertyThumb(s, g.color, houses),
+            h('span', { class: 'erow-main' }, h('span', { class: 'erow-name' }, s.name), h('span', { class: `erow-status ${prop?.mortgaged ? 'warn' : ''}` }, status)),
+            h('span', { class: 'erow-rent', title: 'Rent now' }, rent)
+          );
+          row.addEventListener('click', () => this.inspect(i));
+          rows.append(row);
+        }
+      }
+      this.empireGroups.append(h('div', { class: `egroup ${open ? 'open' : ''}`, 'data-group': g.id }, head, rows));
+    }
+    this.empireGroups.scrollTop = scroll;
   }
 
   private waiting(text: string): HTMLElement {
     return h('div', { class: 'waiting' }, h('div', { class: 'spinner small' }), text);
   }
 
-  private renderPanel(st: GameState, legal: LegalActions | null): void {
-    clear(this.panel);
+  private dock(title: string | null, text: string | null, ...rest: (HTMLElement | null)[]): void {
+    if (title) this.dockCard.append(h('h3', {}, title));
+    if (text) this.dockCard.append(h('p', {}, text));
+    for (const r of rest) if (r) this.dockCard.append(r);
+  }
+
+  private renderDock(st: GameState, legal: LegalActions | null): void {
+    clear(this.dockCard);
+    this.fillDock(st, legal);
+    this.dockCard.hidden = this.dockCard.childElementCount === 0;
+    this.dockCard.classList.toggle('compact', this.dockCard.childElementCount === 1 && !!this.dockCard.firstElementChild?.classList.contains('waiting'));
+  }
+
+  private fillDock(st: GameState, legal: LegalActions | null): void {
     if (st.phase === 'GAME_OVER') {
-      this.panel.append(h('h3', {}, 'Game over'), h('p', {}, st.endReason ?? ''), button('Show results', () => this.showResults(true), { variant: 'primary', block: true }));
+      this.dock('Game over', st.endReason ?? '', h('div', { class: 'actions' }, button('Show results', () => this.showResults(true), { variant: 'primary' })));
       return;
     }
     const meP = this.player(this.me);
     if (meP?.bankrupt) {
-      this.panel.append(h('h3', {}, 'You are bankrupt'), h('p', {}, 'You can keep watching until the game ends.'));
-      return;
-    }
-    if (!legal) {
-      this.panel.append(this.waiting('...'));
+      this.dock('You are bankrupt', 'You can keep watching until the game ends.');
       return;
     }
     const actors = pendingActors(st);
     const actorName = this.nameOf(actors[0]);
     const actorIsBot = actors[0] ? this.player(actors[0])?.kind === 'bot' : false;
+    if (!legal) {
+      if (st.turn.playerId !== this.me) this.dock(null, null, this.waiting(actorIsBot ? `${actorName} is playing...` : `${actorName}’s move...`));
+      return;
+    }
 
     switch (st.phase) {
       case 'PROPERTY_DECISION': {
         const space = st.pendingPurchase as number;
         const s = getSpace(this.ctx, space);
-        if (st.turn.playerId === this.me) {
-          this.panel.append(h('h3', {}, `Buy ${s.name}?`), propertyCard(this.ctx, st, space));
-          const acts = h('div', { class: 'actions' });
-          acts.append(button(`Buy for ${money(s.price ?? 0)}`, () => this.act({ type: 'BUY' }), { variant: 'success', disabled: !legal.canBuy, kbd: 'B', testid: 'btn-buy' }));
-          if (!legal.canBuy) acts.append(h('p', {}, `You need ${money((s.price ?? 0) - (meP?.cash ?? 0))} more. Mortgage or sell to raise funds, or let it go to auction.`), button('Raise funds', () => this.openManage(), { small: true }));
-          acts.append(button(st.config.auctions ? 'Send to auction' : 'Decline', () => this.act({ type: 'DECLINE' }), { kbd: 'A', testid: 'btn-auction' }));
-          this.panel.append(acts);
-        } else {
-          this.panel.append(this.waiting(`${actorName} is deciding whether to buy ${s.name}`));
+        if (st.turn.playerId !== this.me) {
+          this.dock(null, null, this.waiting(`${actorName} is deciding whether to buy ${s.name}`));
+          return;
         }
+        const acts = h('div', { class: 'actions' });
+        acts.append(button(`Buy for ${money(s.price ?? 0)}`, () => this.act({ type: 'BUY' }), { variant: 'primary', disabled: !legal.canBuy, kbd: 'B', testid: 'btn-buy' }));
+        acts.append(button(st.config.auctions ? 'Auction' : 'Decline', () => this.act({ type: 'DECLINE' }), { kbd: 'A', testid: 'btn-auction' }));
+        if (!legal.canBuy) acts.append(button('Raise funds', () => this.openManage(), { small: true }));
+        const swatch = h('i', { class: 'dock-swatch', style: `background:${spaceColor(this.ctx, s)}` });
+        this.dockCard.append(h('h3', {}, swatch, `Buy ${s.name}?`));
+        this.dock(
+          null,
+          legal.canBuy
+            ? `Price ${money(s.price ?? 0)} · you have ${money(meP?.cash ?? 0)}.${st.config.auctions ? ' Pass and it goes to auction.' : ''}`
+            : `You need ${money((s.price ?? 0) - (meP?.cash ?? 0))} more. Mortgage or sell to raise funds, or let it go to auction.`,
+          acts
+        );
         return;
       }
       case 'AUCTION': {
@@ -555,10 +750,10 @@ class GameView {
         if (!a) return;
         const s = getSpace(this.ctx, a.space);
         const bidder = currentBidder(st);
-        this.panel.append(
-          h('h3', {}, `Auction: ${s.name}`),
-          h('p', {}, a.highestBidderId ? `Highest bid ${money(a.highestBid)} by ${this.nameOf(a.highestBidderId)}` : 'No bids yet. Minimum bid $1.'),
-          h('div', { class: 'row bidders', style: 'margin-bottom:10px' }, ...a.bidders.map((id) => h('span', { class: `badge ${id === bidder ? 'blue' : ''}` }, this.nameOf(id))))
+        this.dock(
+          `Auction: ${s.name}`,
+          a.highestBidderId ? `Highest bid ${money(a.highestBid)} by ${this.nameOf(a.highestBidderId)}` : 'No bids yet. Minimum bid $1.',
+          h('div', { class: 'row bidders' }, ...a.bidders.map((id) => h('span', { class: `badge ${id === bidder ? 'blue' : ''}` }, this.nameOf(id))))
         );
         if (legal.canPassBid) {
           const min = auctionMinBid(st);
@@ -566,18 +761,24 @@ class GameView {
           if (this.bidValue < min || this.bidValue > max) this.bidValue = Math.min(max, Math.max(min, Math.round(((s.price ?? 0) * 0.5) / 10) * 10));
           const input = h('input', { class: 'input', type: 'number', min, max, value: this.bidValue, inputmode: 'numeric', 'aria-label': 'Your bid', 'data-testid': 'bid-input' });
           input.addEventListener('input', () => (this.bidValue = Math.floor(Number(input.value) || 0)));
+          input.title = `You can bid ${money(min)} to ${money(max)}`;
           const quick = h(
             'div',
             { class: 'row bid-quick' },
             ...[1, 10, 50, 100].map((inc) =>
-              button(`+${inc}`, () => {
-                this.bidValue = Math.min(max, Math.max(min, (a.highestBidderId ? a.highestBid : 0) + inc));
-                input.value = String(this.bidValue);
-              }, { small: true, disabled: (a.highestBidderId ? a.highestBid : 0) + inc > max })
+              button(
+                `+${inc}`,
+                () => {
+                  this.bidValue = Math.min(max, Math.max(min, (a.highestBidderId ? a.highestBid : 0) + inc));
+                  input.value = String(this.bidValue);
+                },
+                { small: true, disabled: (a.highestBidderId ? a.highestBid : 0) + inc > max }
+              )
             )
           );
-          input.title = `You can bid ${money(min)} to ${money(max)}`;
-          this.panel.append(
+          this.dock(
+            null,
+            null,
             quick,
             h(
               'div',
@@ -586,39 +787,39 @@ class GameView {
               button('Place bid', () => this.act({ type: 'BID', amount: this.bidValue }), { variant: 'primary', disabled: !legal.bid, testid: 'btn-bid' }),
               button('Pass', () => this.act({ type: 'PASS_BID' }), { testid: 'btn-pass' })
             ),
-            h('p', { class: 'small-text muted bid-hint' }, `You can bid ${money(min)} to ${money(max)}.`)
+            h('p', { class: 'bid-hint' }, `You can bid ${money(min)} to ${money(max)}.`)
           );
-        } else {
-          this.panel.append(this.waiting(`${this.nameOf(bidder)} ${actorIsBot ? 'is thinking...' : 'is bidding...'}`));
-        }
+        } else this.dock(null, null, this.waiting(`${this.nameOf(bidder)} ${actorIsBot ? 'is thinking...' : 'is bidding...'}`));
         return;
       }
       case 'DEBT_RESOLUTION': {
         const d = st.debts[0];
         if (!d) return;
-        if (d.debtorId === this.me) {
-          const short = Math.max(0, d.amount - (meP?.cash ?? 0));
-          this.panel.append(
-            h('h3', {}, `You owe ${money(d.amount)}`),
-            h('p', {}, `To ${this.nameOf(d.creditorId)} (${d.reason}). ${short ? `You need ${money(short)} more: sell buildings, mortgage property or trade.` : 'You can pay now.'}`),
-            h(
-              'div',
-              { class: 'actions' },
-              button(`Pay ${money(d.amount)}`, () => this.act({ type: 'PAY_DEBT' }), { variant: 'success', disabled: !legal.canPayDebt, testid: 'btn-pay-debt' }),
-              button('Manage properties', () => this.openManage(), {}),
-              button('Propose a trade', () => this.openTrade(), { disabled: !legal.canProposeTrade }),
-              button(
-                'Declare bankruptcy',
-                () => {
-                  const go = () => this.act({ type: 'DECLARE_BANKRUPTCY' });
-                  if (settings.get().confirmDestructive) void confirmDialog('Declare bankruptcy?', `You will leave the game and your assets go to ${this.nameOf(d.creditorId)}.`, 'Declare bankruptcy', true).then((y) => y && go());
-                  else go();
-                },
-                { variant: 'danger', disabled: !legal.canDeclareBankruptcy, testid: 'btn-bankrupt' }
-              )
+        if (d.debtorId !== this.me) {
+          this.dock(null, null, this.waiting(`${this.nameOf(d.debtorId)} is raising ${money(d.amount)}`));
+          return;
+        }
+        const short = Math.max(0, d.amount - (meP?.cash ?? 0));
+        this.dock(
+          `You owe ${money(d.amount)}`,
+          `To ${this.nameOf(d.creditorId)} (${d.reason}). ${short ? `You need ${money(short)} more: sell buildings, mortgage property or trade.` : 'You can pay now.'}`,
+          h(
+            'div',
+            { class: 'actions' },
+            button(`Pay ${money(d.amount)}`, () => this.act({ type: 'PAY_DEBT' }), { variant: 'primary', disabled: !legal.canPayDebt, testid: 'btn-pay-debt' }),
+            button('Manage', () => this.openManage(), {}),
+            button('Trade', () => this.openTrade(), { disabled: !legal.canProposeTrade }),
+            button(
+              'Declare bankruptcy',
+              () => {
+                const go = () => this.act({ type: 'DECLARE_BANKRUPTCY' });
+                if (settings.get().confirmDestructive) void confirmDialog('Declare bankruptcy?', `You will leave the game and your assets go to ${this.nameOf(d.creditorId)}.`, 'Declare bankruptcy', true).then((y) => y && go());
+                else go();
+              },
+              { variant: 'danger', disabled: !legal.canDeclareBankruptcy, testid: 'btn-bankrupt' }
             )
-          );
-        } else this.panel.append(this.waiting(`${this.nameOf(d.debtorId)} is raising ${money(d.amount)}`));
+          )
+        );
         return;
       }
       case 'TRADE': {
@@ -628,36 +829,37 @@ class GameView {
         const summary = (gives: string[], gets: string[], fromName: string, toName: string) =>
           h('div', { class: 'trade-summary' }, h('div', {}, h('b', {}, `${fromName} give${fromName === 'You' ? '' : 's'}`), gives.join(', ') || 'Nothing'), h('div', {}, h('b', {}, `${toName} give${toName === 'You' ? '' : 's'}`), gets.join(', ') || 'Nothing'));
         if (t.toId === this.me) {
-          this.panel.append(
-            h('h3', {}, `Trade offer from ${this.nameOf(t.fromId)}`),
+          this.dock(
+            `Trade offer from ${this.nameOf(t.fromId)}`,
+            null,
             summary(desc.gives, desc.gets, this.nameOf(t.fromId), 'You'),
             h(
               'div',
               { class: 'actions' },
-              button('Accept', () => this.act({ type: 'ACCEPT_TRADE' }), { variant: 'success', testid: 'btn-accept-trade' }),
+              button('Accept', () => this.act({ type: 'ACCEPT_TRADE' }), { variant: 'primary', testid: 'btn-accept-trade' }),
               button('Counteroffer', () => openTradeDialog({ ctx: this.ctx, me: this.me, getState: () => this.display, dispatch: (a) => this.act(a) }, { counter: t }), { disabled: t.counterCount >= 3 }),
               button('Reject', () => this.act({ type: 'REJECT_TRADE' }), { variant: 'danger', testid: 'btn-reject-trade' })
             )
           );
         } else if (t.fromId === this.me) {
-          this.panel.append(h('h3', {}, 'Your trade offer'), summary(desc.gives, desc.gets, 'You', this.nameOf(t.toId)), this.waiting(`Waiting for ${this.nameOf(t.toId)}...`), h('div', { class: 'actions', style: 'margin-top:10px' }, button('Withdraw offer', () => this.act({ type: 'CANCEL_TRADE' }), { testid: 'btn-cancel-trade' })));
-        } else this.panel.append(this.waiting(`${this.nameOf(t.toId)} is considering a trade from ${this.nameOf(t.fromId)}`));
+          this.dock('Your trade offer', null, summary(desc.gives, desc.gets, 'You', this.nameOf(t.toId)), this.waiting(`Waiting for ${this.nameOf(t.toId)}...`), h('div', { class: 'actions' }, button('Withdraw offer', () => this.act({ type: 'CANCEL_TRADE' }), { testid: 'btn-cancel-trade' })));
+        } else this.dock(null, null, this.waiting(`${this.nameOf(t.toId)} is considering a trade from ${this.nameOf(t.fromId)}`));
         return;
       }
       case 'JAIL_DECISION': {
         if (st.turn.playerId !== this.me) {
-          this.panel.append(this.waiting(`${actorName} is in Jail and deciding what to do`));
+          this.dock(null, null, this.waiting(`${actorName} is in Jail and deciding what to do`));
           return;
         }
-        this.panel.append(
-          h('h3', {}, 'You are in Jail'),
-          h('p', {}, `Attempt ${(meP?.jailTurns ?? 0) + 1} of ${st.config.maxJailTurns}. Roll doubles to get out free, pay ${money(st.config.jailFine)}, or use a card. After the last failed roll you must pay and move.`),
+        this.dock(
+          'You are in Jail',
+          `Attempt ${(meP?.jailTurns ?? 0) + 1} of ${st.config.maxJailTurns}. Roll doubles to get out free, pay ${money(st.config.jailFine)}, or use a card.`,
           h(
             'div',
             { class: 'actions' },
-            button('Roll for doubles', () => this.act({ type: 'ROLL' }), { variant: 'primary', disabled: !legal.canRoll, kbd: 'Space', testid: 'btn-jail-roll' }),
+            button('Roll for doubles', () => this.act({ type: 'ROLL' }), { variant: 'primary', disabled: !legal.canRoll, testid: 'btn-jail-roll' }),
             button(`Pay ${money(st.config.jailFine)}`, () => this.act({ type: 'PAY_JAIL_FINE' }), { disabled: !legal.canPayJailFine, testid: 'btn-pay-fine' }),
-            button(`Use Get Out of Jail Free card`, () => this.act({ type: 'USE_JAIL_CARD' }), { disabled: !legal.canUseJailCard, testid: 'btn-use-card' })
+            legal.canUseJailCard ? button('Use jail card', () => this.act({ type: 'USE_JAIL_CARD' }), { testid: 'btn-use-card' }) : null
           )
         );
         return;
@@ -665,22 +867,17 @@ class GameView {
       case 'AWAIT_ROLL':
       case 'TURN_END': {
         if (st.turn.playerId !== this.me) {
-          this.panel.append(this.waiting(actorIsBot ? `${actorName} is playing...` : `Waiting for ${actorName}...`));
+          this.dock(null, null, this.waiting(actorIsBot ? `${actorName} is playing...` : `Waiting for ${actorName}...`));
           return;
         }
-        const space = getSpace(this.ctx, meP?.position ?? 0);
-        const here = `You are on ${space.name.replace(/\.$/, '')}.`;
-        const actions = h('div', { class: 'actions' });
+        const extras = h('div', { class: 'actions' });
+        if (legal.buildable.length) extras.append(button(`Build (${legal.buildable.length})`, () => this.openManage(), { small: true, icon: icon('house', 16) }));
+        if (legal.unmortgageable.length) extras.append(button('Lift mortgages', () => this.openManage(), { small: true }));
+        const hasExtras = extras.childElementCount > 0;
         if (st.phase === 'AWAIT_ROLL') {
-          this.panel.append(h('h3', {}, st.turn.extraRoll ? 'Doubles! Roll again' : 'Your turn'), h('p', {}, `${here} ${legal.buildable.length ? 'You can build before rolling.' : ''}`));
-          actions.append(button('Roll dice', () => this.act({ type: 'ROLL' }), { variant: 'primary', kbd: 'Space', disabled: !legal.canRoll, testid: 'panel-roll' }));
-        } else {
-          this.panel.append(h('h3', {}, 'Anything else?'), h('p', {}, `${here} Build, trade or manage properties, then end your turn.`));
-          actions.append(button('End turn', () => this.act({ type: 'END_TURN' }), { variant: 'primary', kbd: 'E', disabled: !legal.canEndTurn, testid: 'panel-end-turn' }));
-        }
-        if (legal.buildable.length) actions.append(button(`Build (${legal.buildable.length} options)`, () => this.openManage(), { variant: 'success' }));
-        if (legal.unmortgageable.length) actions.append(button('Lift mortgages', () => this.openManage(), {}));
-        this.panel.append(actions);
+          if (st.turn.extraRoll) this.dock('Doubles! Roll again', hasExtras ? 'You can build before rolling.' : null, hasExtras ? extras : null);
+          else if (hasExtras) this.dock(null, 'You can build before rolling.', extras);
+        } else this.dock(null, 'Build, trade or manage your properties, then end your turn.', hasExtras ? extras : null);
         return;
       }
       default:
@@ -689,22 +886,55 @@ class GameView {
   }
 
   /* ------------------------------------------------------------------ */
-  /* Dialogs                                                              */
+  /* Title deed                                                           */
   /* ------------------------------------------------------------------ */
 
+  /** The space a decision is pending on, if any. */
+  private decisionSpace(st: GameState): number | null {
+    if (st.phase === 'PROPERTY_DECISION' && st.pendingPurchase !== null) return st.pendingPurchase;
+    if (st.phase === 'AUCTION' && st.auction) return st.auction.space;
+    return null;
+  }
+
+  private deedIndex(st: GameState): number {
+    return this.decisionSpace(st) ?? this.pinned ?? this.focusSpace;
+  }
+
+  private deedPanelVisible(): boolean {
+    return this.deedPanel.offsetParent !== null;
+  }
+
+  private renderDeed(st: GameState, legal: LegalActions | null): void {
+    if (this.decisionSpace(st) !== null && this.pinned !== null) {
+      this.pinned = null;
+      this.app.renderer?.setSelected(null);
+    }
+    const index = this.deedIndex(st);
+    const scroll = this.deedPanel.scrollTop;
+    const same = this.deedPanel.firstElementChild?.getAttribute('data-space') === String(index);
+    clear(this.deedPanel);
+    this.deedPanel.append(deedView({ ctx: this.ctx, state: st, index, me: this.me, legal, act: (a) => this.act(a), nameOf: (id) => this.nameOf(id) }));
+    if (same) this.deedPanel.scrollTop = scroll;
+  }
+
+  /** Show a space's title deed: in the side panel on wide screens, in a dialog on phones. */
   private inspect(index: number): void {
     const r = this.app.renderer;
+    this.pinned = index;
     r?.setSelected(index);
-    void r?.focusTile(index, this.ms(450));
+    audio.play('click');
+    if (this.deedPanelVisible()) {
+      this.render();
+      return;
+    }
     this.inspector?.handle.close();
-    const space = getSpace(this.ctx, index);
-    const handle = modal(space.name, {
+    const handle = modal('Title deed', {
       narrow: true,
       testid: 'inspector',
       onClose: () => {
         if (this.inspector?.handle === handle) this.inspector = null;
+        if (this.pinned === index) this.pinned = null;
         r?.setSelected(null);
-        void r?.resetCamera(this.ms(450));
       }
     });
     this.inspector = { handle, index };
@@ -714,25 +944,53 @@ class GameView {
   private fillInspector(): void {
     if (!this.inspector) return;
     const { handle, index } = this.inspector;
-    const st = this.display;
     clear(handle.body);
     clear(handle.foot);
-    handle.body.append(propertyCard(this.ctx, st, index));
-    const legal = this.playing ? null : getLegalActions(st, this.me, this.ctx);
-    const prop = st.properties[index];
-    if (legal && prop?.owner === this.me) {
-      const s = getSpace(this.ctx, index);
-      if (legal.buildable.includes(index)) handle.foot.append(button(prop.houses === 4 ? 'Build hotel' : 'Build house', () => this.act({ type: 'BUILD', space: index }), { variant: 'success', small: true }));
-      if (legal.sellable.includes(index)) handle.foot.append(button('Sell building', () => this.act({ type: 'SELL_BUILDING', space: index }), { variant: 'warn', small: true }));
-      if (legal.mortgageable.includes(index)) handle.foot.append(button(`Mortgage +${money(s.mortgage ?? 0)}`, () => this.act({ type: 'MORTGAGE', space: index }), { small: true }));
-      if (legal.unmortgageable.includes(index)) handle.foot.append(button('Lift mortgage', () => this.act({ type: 'UNMORTGAGE', space: index }), { small: true }));
-    }
-    if (legal?.canBuy && st.pendingPurchase === index) handle.foot.append(button('Buy', () => this.act({ type: 'BUY' }), { variant: 'success', small: true }));
+    const legal = this.playing ? null : getLegalActions(this.display, this.me, this.ctx);
+    handle.body.append(deedView({ ctx: this.ctx, state: this.display, index, me: this.me, legal, act: (a) => this.act(a), nameOf: (id) => this.nameOf(id) }));
     handle.foot.append(button('Close', () => handle.close(), { variant: 'ghost', small: true }));
   }
 
   private refreshInspector(): void {
     if (this.inspector) this.fillInspector();
+  }
+
+  private applyHighlights(): void {
+    this.highlightBtn.setAttribute('aria-pressed', String(this.highlightMine));
+    this.app.renderer?.setHighlights(this.highlightMine ? ownedSpaces(this.display, this.me) : [], '#E8B23A');
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Dialogs                                                              */
+  /* ------------------------------------------------------------------ */
+
+  private openAllDeeds(): void {
+    const m = modal('All title deeds', { wide: true, testid: 'all-deeds' });
+    const st = this.display;
+    const grid = h('div', { class: 'deed-index' });
+    for (const g of this.ctx.board.groups) {
+      const list = h('div', { class: 'deed-index-group' }, h('div', { class: 'dig-head' }, h('i', { class: 'gbar', style: `background:${g.color}` }), g.name));
+      for (const i of groupSpaces(this.ctx, g.id)) {
+        const s = getSpace(this.ctx, i);
+        const prop = st.properties[i];
+        const owner = prop?.owner ? this.player(prop.owner) : undefined;
+        const row = h(
+          'button',
+          { type: 'button', class: 'dig-row' },
+          propertyThumb(s, g.color, prop?.houses ?? 0),
+          h('span', { class: 'erow-main' }, h('span', { class: 'erow-name' }, s.name), h('span', { class: 'erow-status' }, owner ? `${owner.id === this.me ? 'Yours' : owner.name}${prop?.mortgaged ? ' · mortgaged' : ''}` : 'For sale')),
+          h('span', { class: 'erow-rent' }, money(s.price ?? 0)),
+          owner ? h('i', { class: 'owner-dot', style: `background:${owner.color}` }) : null
+        );
+        row.addEventListener('click', () => {
+          m.close();
+          this.inspect(i);
+        });
+        list.append(row);
+      }
+      grid.append(list);
+    }
+    m.body.append(grid);
   }
 
   private openManage(viewing?: string): void {
@@ -753,7 +1011,8 @@ class GameView {
       this.display,
       () => {
         this.manage = null;
-        this.app.renderer?.setSelected(null);
+        this.app.renderer?.setSelected(this.pinned);
+        this.applyHighlights();
       }
     );
   }
@@ -772,6 +1031,16 @@ class GameView {
     const list = h('div', { class: 'log-list' });
     for (const entry of [...this.display.log].reverse()) list.append(h('div', { class: 'entry' }, h('span', { class: 'turn' }, `T${entry.turn}`), entry.text));
     m.body.append(list);
+  }
+
+  private openSettings(): void {
+    const s = modal('Settings', { wide: true });
+    s.body.append(settingsForm());
+  }
+
+  private openHowTo(): void {
+    const s = modal('How to play', { wide: true });
+    s.body.append(howToContent());
   }
 
   private openMenu(): void {
@@ -799,16 +1068,22 @@ class GameView {
           },
           { block: true, disabled: isLan && !this.session.isHost, testid: 'menu-save' }
         ),
-        button('Settings', () => {
-          m.close();
-          const s = modal('Settings', { wide: true });
-          s.body.append(settingsForm());
-        }, { block: true }),
-        button('How to play', () => {
-          m.close();
-          const s = modal('How to play', { wide: true });
-          s.body.append(howToContent());
-        }, { block: true }),
+        button(
+          'Settings',
+          () => {
+            m.close();
+            this.openSettings();
+          },
+          { block: true }
+        ),
+        button(
+          'How to play',
+          () => {
+            m.close();
+            this.openHowTo();
+          },
+          { block: true }
+        ),
         button(
           isLan ? 'Leave game' : 'Quit to main menu',
           () => {
@@ -870,17 +1145,25 @@ class GameView {
       );
     });
     table.append(tbody);
-    m.body.append(table, h('p', { class: 'muted small-text' }, `${st.turn.number} turns played over ${this.roundOf(st)} rounds.`));
+    m.body.append(h('div', { class: 'table-scroll' }, table), h('p', { class: 'muted small-text' }, `${st.turn.number} turns played over ${this.roundOf(st)} rounds.`));
     m.foot.append(
       button('View board', () => m.close(), { variant: 'ghost' }),
-      button('Main menu', () => {
-        m.close();
-        this.app.show(menuScreen);
-      }, { testid: 'results-menu' }),
-      button('Play again', () => {
-        m.close();
-        this.opts.onPlayAgain();
-      }, { variant: 'primary', testid: 'results-again' })
+      button(
+        'Main menu',
+        () => {
+          m.close();
+          this.app.show(menuScreen);
+        },
+        { testid: 'results-menu' }
+      ),
+      button(
+        'Play again',
+        () => {
+          m.close();
+          this.opts.onPlayAgain();
+        },
+        { variant: 'primary', testid: 'results-again' }
+      )
     );
   }
 

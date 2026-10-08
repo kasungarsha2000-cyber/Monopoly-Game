@@ -27,6 +27,7 @@ export {
   activePlayers,
   computeRent,
   countBuildings,
+  countOwnedInGroup,
   currentPlayer,
   findPlayer,
   formatMoney,

@@ -27,9 +27,9 @@ Health check; room creation and join by code; lobby updates for all clients; unk
 ## Browser tests (`tests/e2e`)
 
 - `app.spec.ts`: menu loads without console errors, WebGL canvas exists, canvas resizes with the viewport, settings persist, How to Play opens, security headers on the static build.
-- `solo.spec.ts`: a solo match played with the real buttons with no WebSocket opened; HUD cash matches the engine; mouse clicks select tiles; keyboard shortcuts, properties, trade and log dialogs; autosave restores after reload.
+- `solo.spec.ts`: a solo match played with the real buttons with no WebSocket opened; player-card cash matches the engine; mouse clicks show the clicked space in the title-deed panel, and the deed index and highlight toggle work; keyboard shortcuts, properties, trade and log dialogs; autosave restores after reload.
 - `lan.spec.ts`: two browser contexts host and join (invite link), add a bot, start, play several turns and converge on the same state; a guest reload rejoins the same seat; wrong codes are reported; a page from another origin cannot open a WebSocket.
-- `mobile.spec.ts` (Pixel 7 profile): no horizontal overflow, bottom-bar buttons on screen and touch-sized, touch play, touch taps select tiles.
+- `mobile.spec.ts` (Pixel 7 profile): no horizontal overflow, dock and action-bar buttons on screen and touch-sized, touch play, a tap on a tile opens its title deed as a sheet.
 
 Browser tests use `?e2e=1`, which only makes animations instant, speeds up local bots and exposes a read-only `window.__pe` helper (plus `act`, which goes through the same validated `dispatch` path as the buttons) and `window.__pe3d` (the renderer, for graphics debugging). Neither is enabled without the query parameter.
 

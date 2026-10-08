@@ -2,16 +2,17 @@
 
 A friendly, Monopoly-inspired 3D property trading board game that runs in any modern browser on desktop or phone. Play solo against offline bots, or host a game on your home Wi-Fi or phone hotspot so friends can join from their own browsers. No accounts, no cloud services, no installs for players.
 
-Everything here is original: board names, card texts, artwork (drawn procedurally at runtime), tokens and branding. The rules are classic-inspired and configurable.
+Everything here is original: board names, card texts, artwork (drawn procedurally at runtime), tokens and branding. The only third-party assets are two open-source typefaces, Outfit and Figtree (SIL Open Font License), bundled from npm. The rules are classic-inspired and configurable.
 
 ## Features
 
-- **3D board in the browser** (Three.js/WebGL): a wooden tabletop and walnut board frame, 40 labeled spaces painted procedurally at up to 4096 px, glossy turned tokens, houses and hotels with roofs and windows, rounded dice, soft shadows and image-based reflections, ownership strips, mortgage dimming, selection and build highlights. Everything is generated in code, with no image or model downloads.
+- **3D board in the browser** (Three.js/WebGL): a cream board with 40 labeled spaces painted procedurally at up to 4096 px, a miniature city in the middle (towers with lit windows, rooftop details, roads with traffic, parks and round trees) on green felt, a "Property Empire" plaque, a white and a green die on a felt tray, Fortune and Community card stacks, glossy turned tokens, houses and hotels, soft shadows and image-based reflections, ownership strips, mortgage dimming, selection and build highlights. Everything is generated in code, with no image or model downloads.
+- **Game table layout**: a header with the turn, every player's card (cash, deeds, bot level, whose turn it is) and the latest event; a **Your empire** panel with your cash, net worth and properties grouped by district (with a "highlight mine on board" toggle); the framed 3D board with zoom controls and a dock for Roll dice, End turn, buying, auctions, Jail, debts and trades; and a **Title deed** panel with an illustration, price, current rent, color-group progress and the rent table. Fonts (Outfit and Figtree) ship with the app.
 - **Complete rules**: dice and doubles, three-doubles-to-Jail, GO salary, purchases and round-robin auctions, rent (color-group doubling, buildings, transit and utilities), even building with a limited Bank stock (32 houses / 12 hotels), selling buildings, mortgages with 10% interest, two 16-card decks, Get Out of Jail Free cards, trading with counteroffers, debt resolution, bankruptcy to players or the Bank (with auctions), winner detection, optional round limit and Free Parking jackpot.
 - **Bots**: Easy, Medium and Hard heuristic bots that buy, bid, build, mortgage, trade, manage debt and get out of Jail. Fully offline, deterministic in tests, always legal (with a safe fallback).
 - **LAN multiplayer**: an authoritative Node.js WebSocket room server. Join by 5-letter room code, invite link or manual server address. Mixed humans and bots, reconnect with a session token, autopilot for disconnected players, host-side saves.
 - **Save and resume**: solo games autosave to IndexedDB (with a backup); LAN games are saved atomically on the host and restored after a server restart.
-- **Responsive UI**: desktop mouse and keyboard, phone touch controls, portrait and landscape, reduced motion, graphics quality, volume and camera settings.
+- **Responsive UI**: three columns on desktop, two on tablets (deeds open as dialogs), and on phones the board fills the screen with a bottom action bar; portrait and landscape, mouse, keyboard and touch, reduced motion, graphics quality, volume and camera settings.
 - **Sound**: all effects and the soft background music are synthesized with Web Audio (no audio files).
 
 ## Game rules (summary)
@@ -34,8 +35,8 @@ Presets: **Classic**, **Quick Game** ($2,000 start, 30-round limit) and **Jackpo
 
 ## Controls
 
-- **Mouse**: drag to rotate, scroll to zoom, right-drag (or Shift+drag) to pan, click a space to inspect it.
-- **Touch**: drag to rotate, pinch to zoom, two-finger drag to pan, tap a space to inspect it.
+- **Mouse**: drag to rotate, scroll to zoom, right-drag (or Shift+drag) to pan, click a space to show its title deed.
+- **Touch**: drag to rotate, pinch to zoom, two-finger drag to pan, tap a space to open its title deed.
 - **Keyboard**: `Space`/`R` roll, `E` end turn, `B` buy, `A` send to auction, `P` properties, `T` trade, `L` log, `+`/`-` zoom, arrow keys rotate, `0` reset camera, `Esc` menu or close dialog.
 - On-screen `+`, `−` and reset buttons are always available.
 

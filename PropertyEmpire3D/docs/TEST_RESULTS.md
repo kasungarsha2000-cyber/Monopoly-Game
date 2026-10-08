@@ -11,7 +11,7 @@ Recorded 2026-10-08 in a headless Linux container (Node v22.22.0, Chromium 1194 
 | Bot tests | `npx vitest run packages/game-core/tests/bots.test.ts` | 15 / 15 pass |
 | Network integration tests | `npx vitest run tests/network` | 12 / 12 pass |
 | All Vitest | `npm test` | 78 / 78 pass (about 6 s) |
-| Browser tests | `npm run test:e2e` | 12 / 12 pass; then `--repeat-each=2`: 24 / 24 pass |
+| Browser tests | `npm run test:e2e` | 12 / 12 pass after the layout redesign (8 min). The earlier `--repeat-each=2` run (24 / 24) predates the redesign. |
 | Bot-only stress run | `npm run simulate -- 30 <n>` for n = 2, 3, 4, 6, 8 | 150 / 150 matches finished, 0 invariant violations, 0 fallback actions |
 
 ## Bot stress run detail
@@ -45,13 +45,17 @@ Head-to-head (60 two-player games per pairing, both seat orders): medium beats e
 | Results dialog showed "Round 31 / 30" and stale overlays | screenshot review | Round display capped; overlays cleared when results open |
 | Graphics looked poor, especially on phones (Low preset forced: 1x pixels, no anti-aliasing, 1024 px board) | user report | New presets and defaults (see BUILD_STATUS), settings migration, 4096 px board art, wood table/frame, glossy lathe tokens, detailed buildings, rounded dice, image-based lighting, visible soft shadows, tighter phone framing |
 | Directional shadows were invisible (washed out by ambient light) | debugging with ambient light disabled | Rebalanced key, fill, hemisphere and environment light |
+| UI looked basic next to the requested reference design | user report | Game-table layout (player-card header, Your empire panel, framed board with action dock, title-deed panel), new palette and bundled fonts, 3D city centre, felt dice tray, plaque and card decks |
+| At 1366x820 the rotated board's GO corner was clipped by its frame, so space 39 could not be clicked | browser test (deed panel) | The camera fit now projects the board corners from the default angle, solves the distance and recentres the projection |
+| Left-column buttons overflowed at tablet width | screenshot review | Grid columns may shrink (`minmax(0, 1fr)`), tighter padding |
+| Event line repeated "Turn N: X's turn." and the default name produced "You's turn" | screenshot review | Event line shows the latest real event; default solo name is "Player" |
 
 ## Verified behaviors (automated)
 
 - The web app loads without uncaught errors; the WebGL canvas initializes and resizes.
 - A full solo match is playable in the browser with no WebSocket connection; HUD balances match the engine.
-- Mouse clicks and touch taps select board tiles and open property cards.
-- Desktop (1366x820) and mobile (Pixel 7, 412x839) layouts: no horizontal overflow, touch-sized controls.
+- Mouse clicks select board tiles and show their title deed in the side panel; the deed index and the highlight toggle work. Touch taps open the deed as a sheet on phones.
+- Desktop (1366x820) and mobile (Pixel 7, 412x839) layouts: no horizontal overflow, touch-sized controls. Screenshots were also reviewed at 1680x900, 1280x720, 1024x768, 390x844 and 844x390.
 - Autosave restores a solo game after a reload.
 - Two independent browser contexts join a LAN room by invite link, play with a server-side bot, and converge on identical state; a guest reload rejoins the same seat.
 - The server rejects client-authored dice, illegal and duplicate commands, malformed and oversized messages, unknown rooms, and WebSocket connections from foreign origins (both from Node clients and from a browser page on another origin).

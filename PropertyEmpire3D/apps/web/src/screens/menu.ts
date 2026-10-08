@@ -83,7 +83,7 @@ export function menuScreen(app: App): () => void {
       'div',
       { class: 'menu-buttons' },
       button('Play Solo', () => app.show(soloSetupScreen), { variant: 'primary', block: true, testid: 'menu-solo' }),
-      button('Create LAN Game', () => app.show(lanCreateScreen), { variant: 'success', block: true, testid: 'menu-create-lan', disabled: standalone }),
+      button('Create LAN Game', () => app.show(lanCreateScreen), { block: true, testid: 'menu-create-lan', disabled: standalone }),
       button('Join LAN Game', () => app.show(joinScreen), { block: true, testid: 'menu-join-lan', disabled: standalone }),
       standalone
         ? h('p', { class: 'muted small-text', style: 'margin:0;text-align:center' }, 'LAN games need the host server. Run "npm run start:lan" on a computer on your Wi-Fi and open the address it prints.')

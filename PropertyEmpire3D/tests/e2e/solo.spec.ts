@@ -44,21 +44,30 @@ test.describe('solo play', () => {
     expect(errors).toEqual([]);
   });
 
-  test('mouse clicks select board tiles and show the property card', async ({ page }) => {
+  test('mouse clicks select board tiles and show their title deed', async ({ page }) => {
     await page.goto('/?e2e=1');
     await page.getByTestId('menu-solo').click();
     await page.getByTestId('start-solo').click();
     await waitForGame(page);
-    await waitIdle(page);
-    for (const space of [39, 1, 24]) {
+    // Nothing else moves while the game waits for our roll.
+    await waitUntilCanRoll(page);
+    const panel = page.getByTestId('deed-panel');
+    await expect(panel).toBeVisible();
+    for (const space of [39, 1, 24, 12]) {
       const pos = await page.evaluate((i) => (window as unknown as { __pe: { tileScreenPos: (n: number) => { x: number; y: number } } }).__pe.tileScreenPos(i), space);
       await page.mouse.click(pos.x, pos.y);
-      await expect(page.getByTestId('inspector').getByTestId('property-card')).toHaveAttribute('data-space', String(space));
-      await page.keyboard.press('Escape');
-      await expect(page.getByTestId('inspector')).toHaveCount(0);
+      await expect(panel.getByTestId('deed')).toHaveAttribute('data-space', String(space));
       await page.getByTestId('camera-reset').click();
       await page.waitForTimeout(100);
     }
+    // The empire panel and the deed index open deeds too.
+    await page.getByTestId('browse-deeds').click();
+    await expect(page.getByTestId('all-deeds')).toBeVisible();
+    await page.getByTestId('all-deeds').getByRole('button', { name: /Mill Lane/ }).click();
+    await expect(page.getByTestId('all-deeds')).toHaveCount(0);
+    await expect(panel.getByTestId('deed')).toHaveAttribute('data-space', '1');
+    await page.getByTestId('highlight-mine').click();
+    await expect(page.getByTestId('highlight-mine')).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('keyboard shortcuts, properties, trade dialog and log work', async ({ page }) => {

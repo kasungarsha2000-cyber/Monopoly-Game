@@ -47,7 +47,7 @@ export function tokenPicker(current: TokenId, onPick: (t: TokenId) => void, colo
 export function startSolo(app: App, setup: SoloSetup): void {
   lastSetup = setup;
   const players: PlayerSetup[] = [
-    { id: 'you', name: setup.name || 'You', kind: 'human', token: setup.token, color: PLAYER_COLORS[0] as string }
+    { id: 'you', name: setup.name || 'Player', kind: 'human', token: setup.token, color: PLAYER_COLORS[0] as string }
   ];
   const usedTokens = new Set<TokenId>([setup.token]);
   setup.bots.forEach((b, i) => {
@@ -66,7 +66,7 @@ export function soloSetupScreen(app: App): void {
   const setup: SoloSetup = lastSetup
     ? structuredClone(lastSetup)
     : {
-        name: s.playerName || 'You',
+        name: s.playerName || 'Player',
         token: (TOKENS as readonly string[]).includes(s.playerToken) ? (s.playerToken as TokenId) : 'pawn',
         bots: [
           { name: 'Ada', difficulty: 'easy' },

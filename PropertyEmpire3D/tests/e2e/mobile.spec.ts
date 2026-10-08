@@ -26,10 +26,10 @@ test('mobile layout is usable and touch taps select tiles', async ({ page }) => 
 
   await expect(page.getByTestId('card-popup')).toHaveCount(0);
   const pos = await page.evaluate(() => (window as unknown as { __pe: { tileScreenPos: (n: number) => { x: number; y: number } } }).__pe.tileScreenPos(5));
-  // The tile must be visible (not under the bottom sheet) and a tap must open its card.
+  // The tile must be visible (not under the action dock) and a tap must open its title deed.
   const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.tagName, pos);
   expect(hit).toBe('CANVAS');
   await page.touchscreen.tap(pos.x, pos.y);
-  await expect(page.getByTestId('inspector').getByTestId('property-card')).toHaveAttribute('data-space', '5');
+  await expect(page.getByTestId('inspector').getByTestId('deed')).toHaveAttribute('data-space', '5');
   expect(errors).toEqual([]);
 });

@@ -1,6 +1,8 @@
 /**
  * Property Empire 3D browser entry point.
  */
+import '@fontsource-variable/outfit';
+import '@fontsource-variable/figtree';
 import './styles/main.css';
 import { App } from './app';
 import { settings } from './settings';
@@ -23,11 +25,15 @@ function boot(): void {
   window.addEventListener('pointerdown', unlock, { once: true, capture: true });
   window.addEventListener('keydown', unlock, { once: true, capture: true });
 
-  requestAnimationFrame(() => {
+  // The board texture paints text on a canvas, so the fonts must be ready first
+  // (never wait more than a moment: system fonts are a fine fallback).
+  const fonts = Promise.all(['700 32px "Outfit Variable"', '600 32px "Figtree Variable"'].map((f) => document.fonts?.load(f).catch(() => undefined)));
+  const ready = Promise.race([fonts, new Promise((r) => window.setTimeout(r, 1200))]);
+  void ready.then(() => requestAnimationFrame(() => {
     app.ensureRenderer();
     const room = new URLSearchParams(location.search).get('room');
     window.setTimeout(() => app.show(room ? joinScreen : menuScreen), app.e2e ? 0 : 350);
-  });
+  }));
 
   if (import.meta.env.PROD && import.meta.env.MODE !== 'standalone' && 'serviceWorker' in navigator && window.isSecureContext && !app.e2e) {
     window.addEventListener('load', () => {

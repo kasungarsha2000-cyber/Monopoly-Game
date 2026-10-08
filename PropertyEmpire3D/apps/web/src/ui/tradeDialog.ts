@@ -12,7 +12,7 @@ import {
 } from '@pe/game-core';
 import { button, clear, h, modal, select, type ModalHandle } from './dom';
 import { money } from './format';
-import { groupColorOf } from './propertyCard';
+import { groupColorOf } from './deed';
 
 export interface TradeDeps {
   ctx: RulesContext;

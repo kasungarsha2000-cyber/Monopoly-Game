@@ -20,7 +20,7 @@ const MAX_POLAR = 1.2;
 export class CameraRig {
   readonly camera: THREE.PerspectiveCamera;
   target = new THREE.Vector3(0, 0, 0);
-  azimuth = 0;
+  azimuth = -0.28;
   polar = 0.82;
   radius = 18;
   private fitRadius = 18;
@@ -31,6 +31,8 @@ export class CameraRig {
   invert = false;
   /** Default tilt; portrait phones use a more top-down view to fill the screen. */
   defaultPolar = 0.82;
+  /** Default heading: slightly from the left, like a player seated at the table. */
+  defaultAzimuth = -0.28;
 
   constructor() {
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
@@ -56,26 +58,60 @@ export class CameraRig {
     this.refit();
   }
 
-  /** Recompute the zoom that shows the whole board inside the free area. */
+  /**
+   * Recompute the zoom that shows the whole board inside the free area: the
+   * board's corners are projected from the default viewing angle, the camera
+   * distance is solved so they fit, and the projection is shifted so the board
+   * (which perspective makes lopsided) is centred in the free area.
+   */
   private refit(): void {
     const freeW = Math.max(120, this.width - this.insets.left - this.insets.right);
     const freeH = Math.max(120, this.height - this.insets.top - this.insets.bottom);
-    const vfov = THREE.MathUtils.degToRad(this.camera.fov);
-    // Fraction of the full viewport the free area occupies.
-    const fx = freeW / this.width;
-    const fy = freeH / this.height;
     const aspect = this.width / this.height;
-    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
-    const needW = (BOARD * 1.06) / 2 / Math.tan((hfov * fx) / 2);
-    const needH = (BOARD * 0.86 * Math.cos(this.polar * 0.6)) / 2 / Math.tan((vfov * fy) / 2);
-    const prevFit = this.fitRadius;
-    this.fitRadius = THREE.MathUtils.clamp(Math.max(needW, needH), 9, 40);
-    // Keep the user's zoom relative to the fitted distance.
-    this.radius = THREE.MathUtils.clamp(this.radius * (this.fitRadius / prevFit), 6, 46);
     this.camera.aspect = aspect;
-    // Shift the projection so the board centers in the free area.
-    const dx = (this.insets.left - this.insets.right) / 2;
-    const dy = (this.insets.top - this.insets.bottom) / 2;
+    const half = BOARD / 2 + 0.35;
+    const corners = [
+      new THREE.Vector3(-half, 0, -half),
+      new THREE.Vector3(half, 0, -half),
+      new THREE.Vector3(half, 0, half),
+      new THREE.Vector3(-half, 0, half)
+    ];
+    const probe = new THREE.PerspectiveCamera(this.camera.fov, aspect, 0.1, 400);
+    const dir = new THREE.Vector3(
+      Math.sin(this.defaultPolar) * Math.sin(this.defaultAzimuth),
+      Math.cos(this.defaultPolar),
+      Math.sin(this.defaultPolar) * Math.cos(this.defaultAzimuth)
+    );
+    const box = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    const measure = (r: number) => {
+      probe.position.copy(dir).multiplyScalar(r);
+      probe.lookAt(0, 0, 0);
+      probe.updateMatrixWorld();
+      box.minX = box.minY = Infinity;
+      box.maxX = box.maxY = -Infinity;
+      for (const c of corners) {
+        const v = c.clone().project(probe);
+        box.minX = Math.min(box.minX, v.x);
+        box.maxX = Math.max(box.maxX, v.x);
+        box.minY = Math.min(box.minY, v.y);
+        box.maxY = Math.max(box.maxY, v.y);
+      }
+    };
+    let r = 30;
+    for (let i = 0; i < 5; i++) {
+      measure(r);
+      // Normalized device coordinates span 2 units across the whole viewport.
+      const scale = Math.max((box.maxX - box.minX) / ((2 * freeW) / this.width), (box.maxY - box.minY) / ((2 * freeH) / this.height));
+      r *= scale;
+    }
+    measure(r);
+    const prevFit = this.fitRadius;
+    this.fitRadius = THREE.MathUtils.clamp(r, 9, 60);
+    // Keep the user's zoom relative to the fitted distance.
+    this.radius = THREE.MathUtils.clamp(this.radius * (this.fitRadius / prevFit), 6, 70);
+    // Shift the projection so the board's centre lands in the centre of the free area.
+    const dx = (this.insets.left - this.insets.right) / 2 - ((box.minX + box.maxX) / 2) * (this.width / 2);
+    const dy = (this.insets.top - this.insets.bottom) / 2 + ((box.minY + box.maxY) / 2) * (this.height / 2);
     this.camera.setViewOffset(this.width, this.height, -dx, -dy, this.width, this.height);
     this.camera.updateProjectionMatrix();
     this.apply();
@@ -144,7 +180,7 @@ export class CameraRig {
   }
 
   reset(tweens: Tweens, durationMs: number): Promise<void> {
-    return this.animateTo(tweens, { target: new THREE.Vector3(0, 0, 0), radius: this.fitRadius, azimuth: 0, polar: this.defaultPolar }, durationMs);
+    return this.animateTo(tweens, { target: new THREE.Vector3(0, 0, 0), radius: this.fitRadius, azimuth: this.defaultAzimuth, polar: this.defaultPolar }, durationMs);
   }
 
   get defaultRadius(): number {
