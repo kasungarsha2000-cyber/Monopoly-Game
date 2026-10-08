@@ -59,7 +59,9 @@ npm start            # serves the game at http://localhost:3001/
 2. Open the page and choose **Play Solo**.
 3. Pick your name and token, add 1 to 7 bots with Easy/Medium/Hard difficulty, choose a preset and starting cash, and press **Start Game**.
 
-Solo games run the shared rules engine and bots inside your browser; no WebSocket or game server is involved after the page has loaded. On `localhost` or HTTPS the app also installs a small service worker so solo play keeps working offline after the first visit.
+Solo games run the shared rules engine and bots inside your browser; no WebSocket or game server is involved after the page has loaded.
+
+To get the solo game as **one self-contained HTML file** (for example to host it as a single page), run `npm run build:artifact -- path/to/output.html`. That page has LAN play turned off because there is no host server behind it. On `localhost` or HTTPS the app also installs a small service worker so solo play keeps working offline after the first visit.
 
 ## How to host a Wi-Fi browser game with Node
 

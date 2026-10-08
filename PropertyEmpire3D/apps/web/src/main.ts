@@ -29,7 +29,7 @@ function boot(): void {
     window.setTimeout(() => app.show(room ? joinScreen : menuScreen), app.e2e ? 0 : 350);
   });
 
-  if (import.meta.env.PROD && 'serviceWorker' in navigator && window.isSecureContext && !app.e2e) {
+  if (import.meta.env.PROD && import.meta.env.MODE !== 'standalone' && 'serviceWorker' in navigator && window.isSecureContext && !app.e2e) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);
     });

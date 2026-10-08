@@ -73,6 +73,8 @@ export function menuScreen(app: App): () => void {
         { variant: 'ghost', small: true }
       )
     : null;
+  // The standalone page (claude.ai artifact) has no host server, so LAN play is unavailable there.
+  const standalone = import.meta.env.MODE === 'standalone';
   const card = h(
     'div',
     { class: 'card menu-card', 'data-testid': 'main-menu' },
@@ -81,8 +83,11 @@ export function menuScreen(app: App): () => void {
       'div',
       { class: 'menu-buttons' },
       button('Play Solo', () => app.show(soloSetupScreen), { variant: 'primary', block: true, testid: 'menu-solo' }),
-      button('Create LAN Game', () => app.show(lanCreateScreen), { variant: 'success', block: true, testid: 'menu-create-lan' }),
-      button('Join LAN Game', () => app.show(joinScreen), { block: true, testid: 'menu-join-lan' }),
+      button('Create LAN Game', () => app.show(lanCreateScreen), { variant: 'success', block: true, testid: 'menu-create-lan', disabled: standalone }),
+      button('Join LAN Game', () => app.show(joinScreen), { block: true, testid: 'menu-join-lan', disabled: standalone }),
+      standalone
+        ? h('p', { class: 'muted small-text', style: 'margin:0;text-align:center' }, 'LAN games need the host server. Run "npm run start:lan" on a computer on your Wi-Fi and open the address it prints.')
+        : null,
       continueBtn
     ),
     h(

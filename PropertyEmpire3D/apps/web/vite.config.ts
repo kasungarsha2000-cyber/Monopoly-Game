@@ -4,8 +4,10 @@ const serverPort = Number(process.env.PE_PORT ?? 3001);
 const webPort = Number(process.env.PE_WEB_PORT ?? 5173);
 const lan = process.env.PE_LAN === '1';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   root: __dirname,
+  // "standalone" builds one self-contained page (used for the claude.ai artifact).
+  base: mode === 'standalone' ? './' : '/',
   publicDir: 'public',
   server: {
     host: lan ? '0.0.0.0' : '127.0.0.1',
@@ -22,15 +24,14 @@ export default defineConfig({
     port: 4173
   },
   build: {
-    outDir: 'dist',
+    outDir: mode === 'standalone' ? 'dist-standalone' : 'dist',
     emptyOutDir: true,
     target: 'es2022',
     sourcemap: false,
     chunkSizeWarningLimit: 900,
+    copyPublicDir: mode !== 'standalone',
     rollupOptions: {
-      output: {
-        manualChunks: { three: ['three'] }
-      }
+      output: mode === 'standalone' ? { inlineDynamicImports: true } : { manualChunks: { three: ['three'] } }
     }
   }
-});
+}));

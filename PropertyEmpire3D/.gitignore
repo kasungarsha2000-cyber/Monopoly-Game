@@ -12,3 +12,5 @@ coverage/
 *.log
 .env
 .DS_Store
+apps/web/dist-standalone/
+artifact/
