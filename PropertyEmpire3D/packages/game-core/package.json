@@ -1,0 +1,13 @@
+{
+  "name": "@pe/game-core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure TypeScript rules engine, data and bots for Property Empire 3D. Shared by the browser client and the Node LAN server.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./data/*": "./data/*"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "name": "property-empire-3d",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Property Empire 3D - a Monopoly-inspired 3D browser board game with offline bots and LAN multiplayer.",
+  "type": "module",
+  "workspaces": [
+    "packages/game-core",
+    "apps/server",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:lan": "node scripts/dev.mjs --lan",
+    "dev:web": "npm run dev --workspace @pe/web",
+    "dev:server": "npm run dev --workspace @pe/server",
+    "build": "npm run build:web && npm run build:server",
+    "build:web": "npm run build --workspace @pe/web",
+    "build:server": "npm run build --workspace @pe/server",
+    "start": "node apps/server/dist/index.js",
+    "start:server": "node apps/server/dist/index.js",
+    "start:lan": "node apps/server/dist/index.js --lan",
+    "typecheck": "tsc -p packages/game-core && tsc -p apps/server && tsc -p apps/web && tsc -p tests",
+    "lint": "npm run typecheck && node scripts/lint.mjs",
+    "test": "vitest run",
+    "test:core": "vitest run packages/game-core",
+    "test:network": "vitest run tests/network",
+    "test:e2e": "playwright test",
+    "test:all": "npm run typecheck && npm run test && npm run build && npm run test:e2e",
+    "simulate": "tsx scripts/simulate.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.18.0",
+    "@types/three": "0.180.0",
+    "@types/ws": "8.18.1",
+    "esbuild": "0.25.10",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.11"
+  }
+}

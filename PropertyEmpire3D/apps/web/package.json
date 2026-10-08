@@ -1,0 +1,16 @@
+{
+  "name": "@pe/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Three.js browser client for Property Empire 3D.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p . && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@pe/game-core": "1.0.0",
+    "three": "0.180.0"
+  }
+}

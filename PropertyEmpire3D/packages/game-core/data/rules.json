@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "defaults": {
+    "startingCash": 1500,
+    "goSalary": 200,
+    "jailFine": 50,
+    "maxJailTurns": 3,
+    "doublesToJail": 3,
+    "auctions": true,
+    "bankruptcyAuctions": true,
+    "freeParkingJackpot": false,
+    "bankHouses": 32,
+    "bankHotels": 12,
+    "mortgageInterestPercent": 10,
+    "evenBuild": true,
+    "minPlayers": 2,
+    "maxPlayers": 8,
+    "maxRounds": 0,
+    "maxTradeProposalsPerTurn": 3
+  },
+  "presets": [
+    {
+      "id": "classic",
+      "name": "Classic",
+      "description": "Classic-inspired rules: $1500 start, auctions, no Free Parking jackpot, play until one player remains.",
+      "overrides": {}
+    },
+    {
+      "id": "quick",
+      "name": "Quick Game",
+      "description": "$2000 start and a 30 round limit. The richest player wins when time runs out.",
+      "overrides": { "startingCash": 2000, "maxRounds": 30 }
+    },
+    {
+      "id": "jackpot",
+      "name": "Jackpot House Rules",
+      "description": "Taxes and card fees go into a Free Parking jackpot that the next visitor collects.",
+      "overrides": { "freeParkingJackpot": true }
+    }
+  ]
+}

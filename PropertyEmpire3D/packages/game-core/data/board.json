@@ -1,0 +1,655 @@
+{
+  "id": "property-empire-classic",
+  "name": "Property Empire City",
+  "version": 1,
+  "groups": [
+    {
+      "id": "brown",
+      "name": "Old Town",
+      "color": "#9A6B4F"
+    },
+    {
+      "id": "sky",
+      "name": "Harbor",
+      "color": "#7FCBEA"
+    },
+    {
+      "id": "pink",
+      "name": "Gardens",
+      "color": "#D65DB1"
+    },
+    {
+      "id": "orange",
+      "name": "Market",
+      "color": "#F08C2E"
+    },
+    {
+      "id": "red",
+      "name": "Theatre",
+      "color": "#E04848"
+    },
+    {
+      "id": "yellow",
+      "name": "Sunrise",
+      "color": "#EDC531"
+    },
+    {
+      "id": "green",
+      "name": "Parklands",
+      "color": "#3BA55C"
+    },
+    {
+      "id": "navy",
+      "name": "Skyline",
+      "color": "#2F4FA8"
+    },
+    {
+      "id": "transport",
+      "name": "Transit",
+      "color": "#5B6472"
+    },
+    {
+      "id": "utility",
+      "name": "Utilities",
+      "color": "#8AA0B4"
+    }
+  ],
+  "spaces": [
+    {
+      "id": "go",
+      "index": 0,
+      "type": "go",
+      "name": "GO",
+      "shortName": "GO"
+    },
+    {
+      "id": "mill-lane",
+      "index": 1,
+      "type": "street",
+      "name": "Mill Lane",
+      "shortName": "Mill Ln",
+      "group": "brown",
+      "price": 60,
+      "rent": [
+        2,
+        10,
+        30,
+        90,
+        160,
+        250
+      ],
+      "houseCost": 50,
+      "mortgage": 30
+    },
+    {
+      "id": "community-fund",
+      "index": 2,
+      "type": "community",
+      "name": "Community Fund",
+      "shortName": "Community"
+    },
+    {
+      "id": "cobble-row",
+      "index": 3,
+      "type": "street",
+      "name": "Cobble Row",
+      "shortName": "Cobble Row",
+      "group": "brown",
+      "price": 60,
+      "rent": [
+        4,
+        20,
+        60,
+        180,
+        320,
+        450
+      ],
+      "houseCost": 50,
+      "mortgage": 30
+    },
+    {
+      "id": "city-tax",
+      "index": 4,
+      "type": "tax",
+      "name": "City Tax",
+      "shortName": "City Tax",
+      "amount": 200
+    },
+    {
+      "id": "northgate-station",
+      "index": 5,
+      "type": "transport",
+      "name": "Northgate Station",
+      "shortName": "Northgate Stn",
+      "group": "transport",
+      "price": 200,
+      "rent": [
+        25,
+        50,
+        100,
+        200
+      ],
+      "mortgage": 100
+    },
+    {
+      "id": "harbor-walk",
+      "index": 6,
+      "type": "street",
+      "name": "Harbor Walk",
+      "shortName": "Harbor Walk",
+      "group": "sky",
+      "price": 100,
+      "rent": [
+        6,
+        30,
+        90,
+        270,
+        400,
+        550
+      ],
+      "houseCost": 50,
+      "mortgage": 50
+    },
+    {
+      "id": "fortune",
+      "index": 7,
+      "type": "chance",
+      "name": "Fortune",
+      "shortName": "Fortune"
+    },
+    {
+      "id": "pier-street",
+      "index": 8,
+      "type": "street",
+      "name": "Pier Street",
+      "shortName": "Pier St",
+      "group": "sky",
+      "price": 100,
+      "rent": [
+        6,
+        30,
+        90,
+        270,
+        400,
+        550
+      ],
+      "houseCost": 50,
+      "mortgage": 50
+    },
+    {
+      "id": "lighthouse-road",
+      "index": 9,
+      "type": "street",
+      "name": "Lighthouse Road",
+      "shortName": "Lighthouse Rd",
+      "group": "sky",
+      "price": 120,
+      "rent": [
+        8,
+        40,
+        100,
+        300,
+        450,
+        600
+      ],
+      "houseCost": 50,
+      "mortgage": 60
+    },
+    {
+      "id": "jail-just-visiting",
+      "index": 10,
+      "type": "jail",
+      "name": "Jail / Just Visiting",
+      "shortName": "Jail"
+    },
+    {
+      "id": "rose-garden",
+      "index": 11,
+      "type": "street",
+      "name": "Rose Garden",
+      "shortName": "Rose Garden",
+      "group": "pink",
+      "price": 140,
+      "rent": [
+        10,
+        50,
+        150,
+        450,
+        625,
+        750
+      ],
+      "houseCost": 100,
+      "mortgage": 70
+    },
+    {
+      "id": "solar-power-co",
+      "index": 12,
+      "type": "utility",
+      "name": "Solar Power Co.",
+      "shortName": "Solar Power",
+      "group": "utility",
+      "price": 150,
+      "rent": [
+        4,
+        10
+      ],
+      "mortgage": 75
+    },
+    {
+      "id": "tulip-terrace",
+      "index": 13,
+      "type": "street",
+      "name": "Tulip Terrace",
+      "shortName": "Tulip Tce",
+      "group": "pink",
+      "price": 140,
+      "rent": [
+        10,
+        50,
+        150,
+        450,
+        625,
+        750
+      ],
+      "houseCost": 100,
+      "mortgage": 70
+    },
+    {
+      "id": "orchid-avenue",
+      "index": 14,
+      "type": "street",
+      "name": "Orchid Avenue",
+      "shortName": "Orchid Ave",
+      "group": "pink",
+      "price": 160,
+      "rent": [
+        12,
+        60,
+        180,
+        500,
+        700,
+        900
+      ],
+      "houseCost": 100,
+      "mortgage": 80
+    },
+    {
+      "id": "eastport-ferry",
+      "index": 15,
+      "type": "transport",
+      "name": "Eastport Ferry",
+      "shortName": "Eastport Ferry",
+      "group": "transport",
+      "price": 200,
+      "rent": [
+        25,
+        50,
+        100,
+        200
+      ],
+      "mortgage": 100
+    },
+    {
+      "id": "maple-court",
+      "index": 16,
+      "type": "street",
+      "name": "Maple Court",
+      "shortName": "Maple Ct",
+      "group": "orange",
+      "price": 180,
+      "rent": [
+        14,
+        70,
+        200,
+        550,
+        750,
+        950
+      ],
+      "houseCost": 100,
+      "mortgage": 90
+    },
+    {
+      "id": "community-fund-2",
+      "index": 17,
+      "type": "community",
+      "name": "Community Fund",
+      "shortName": "Community"
+    },
+    {
+      "id": "amber-square",
+      "index": 18,
+      "type": "street",
+      "name": "Amber Square",
+      "shortName": "Amber Sq",
+      "group": "orange",
+      "price": 180,
+      "rent": [
+        14,
+        70,
+        200,
+        550,
+        750,
+        950
+      ],
+      "houseCost": 100,
+      "mortgage": 90
+    },
+    {
+      "id": "sunset-drive",
+      "index": 19,
+      "type": "street",
+      "name": "Sunset Drive",
+      "shortName": "Sunset Dr",
+      "group": "orange",
+      "price": 200,
+      "rent": [
+        16,
+        80,
+        220,
+        600,
+        800,
+        1000
+      ],
+      "houseCost": 100,
+      "mortgage": 100
+    },
+    {
+      "id": "free-parking",
+      "index": 20,
+      "type": "free_parking",
+      "name": "Free Parking",
+      "shortName": "Parking"
+    },
+    {
+      "id": "ruby-boulevard",
+      "index": 21,
+      "type": "street",
+      "name": "Ruby Boulevard",
+      "shortName": "Ruby Blvd",
+      "group": "red",
+      "price": 220,
+      "rent": [
+        18,
+        90,
+        250,
+        700,
+        875,
+        1050
+      ],
+      "houseCost": 150,
+      "mortgage": 110
+    },
+    {
+      "id": "fortune-2",
+      "index": 22,
+      "type": "chance",
+      "name": "Fortune",
+      "shortName": "Fortune"
+    },
+    {
+      "id": "cardinal-way",
+      "index": 23,
+      "type": "street",
+      "name": "Cardinal Way",
+      "shortName": "Cardinal Way",
+      "group": "red",
+      "price": 220,
+      "rent": [
+        18,
+        90,
+        250,
+        700,
+        875,
+        1050
+      ],
+      "houseCost": 150,
+      "mortgage": 110
+    },
+    {
+      "id": "ember-plaza",
+      "index": 24,
+      "type": "street",
+      "name": "Ember Plaza",
+      "shortName": "Ember Plaza",
+      "group": "red",
+      "price": 240,
+      "rent": [
+        20,
+        100,
+        300,
+        750,
+        925,
+        1100
+      ],
+      "houseCost": 150,
+      "mortgage": 120
+    },
+    {
+      "id": "southfield-airport",
+      "index": 25,
+      "type": "transport",
+      "name": "Southfield Airport",
+      "shortName": "Southfield Air",
+      "group": "transport",
+      "price": 200,
+      "rent": [
+        25,
+        50,
+        100,
+        200
+      ],
+      "mortgage": 100
+    },
+    {
+      "id": "golden-mile",
+      "index": 26,
+      "type": "street",
+      "name": "Golden Mile",
+      "shortName": "Golden Mile",
+      "group": "yellow",
+      "price": 260,
+      "rent": [
+        22,
+        110,
+        330,
+        800,
+        975,
+        1150
+      ],
+      "houseCost": 150,
+      "mortgage": 130
+    },
+    {
+      "id": "sunflower-park",
+      "index": 27,
+      "type": "street",
+      "name": "Sunflower Park",
+      "shortName": "Sunflower Pk",
+      "group": "yellow",
+      "price": 260,
+      "rent": [
+        22,
+        110,
+        330,
+        800,
+        975,
+        1150
+      ],
+      "houseCost": 150,
+      "mortgage": 130
+    },
+    {
+      "id": "clearwater-co",
+      "index": 28,
+      "type": "utility",
+      "name": "Clearwater Co.",
+      "shortName": "Clearwater",
+      "group": "utility",
+      "price": 150,
+      "rent": [
+        4,
+        10
+      ],
+      "mortgage": 75
+    },
+    {
+      "id": "citrine-heights",
+      "index": 29,
+      "type": "street",
+      "name": "Citrine Heights",
+      "shortName": "Citrine Hts",
+      "group": "yellow",
+      "price": 280,
+      "rent": [
+        24,
+        120,
+        360,
+        850,
+        1025,
+        1200
+      ],
+      "houseCost": 150,
+      "mortgage": 140
+    },
+    {
+      "id": "go-to-jail",
+      "index": 30,
+      "type": "go_to_jail",
+      "name": "Go To Jail",
+      "shortName": "Go To Jail"
+    },
+    {
+      "id": "emerald-park",
+      "index": 31,
+      "type": "street",
+      "name": "Emerald Park",
+      "shortName": "Emerald Pk",
+      "group": "green",
+      "price": 300,
+      "rent": [
+        26,
+        130,
+        390,
+        900,
+        1100,
+        1275
+      ],
+      "houseCost": 200,
+      "mortgage": 150
+    },
+    {
+      "id": "fern-gardens",
+      "index": 32,
+      "type": "street",
+      "name": "Fern Gardens",
+      "shortName": "Fern Gdns",
+      "group": "green",
+      "price": 300,
+      "rent": [
+        26,
+        130,
+        390,
+        900,
+        1100,
+        1275
+      ],
+      "houseCost": 200,
+      "mortgage": 150
+    },
+    {
+      "id": "community-fund-3",
+      "index": 33,
+      "type": "community",
+      "name": "Community Fund",
+      "shortName": "Community"
+    },
+    {
+      "id": "jade-crescent",
+      "index": 34,
+      "type": "street",
+      "name": "Jade Crescent",
+      "shortName": "Jade Cres",
+      "group": "green",
+      "price": 320,
+      "rent": [
+        28,
+        150,
+        450,
+        1000,
+        1200,
+        1400
+      ],
+      "houseCost": 200,
+      "mortgage": 160
+    },
+    {
+      "id": "westline-tram",
+      "index": 35,
+      "type": "transport",
+      "name": "Westline Tram",
+      "shortName": "Westline Tram",
+      "group": "transport",
+      "price": 200,
+      "rent": [
+        25,
+        50,
+        100,
+        200
+      ],
+      "mortgage": 100
+    },
+    {
+      "id": "fortune-3",
+      "index": 36,
+      "type": "chance",
+      "name": "Fortune",
+      "shortName": "Fortune"
+    },
+    {
+      "id": "sapphire-bay",
+      "index": 37,
+      "type": "street",
+      "name": "Sapphire Bay",
+      "shortName": "Sapphire Bay",
+      "group": "navy",
+      "price": 350,
+      "rent": [
+        35,
+        175,
+        500,
+        1100,
+        1300,
+        1500
+      ],
+      "houseCost": 200,
+      "mortgage": 175
+    },
+    {
+      "id": "luxury-levy",
+      "index": 38,
+      "type": "tax",
+      "name": "Luxury Levy",
+      "shortName": "Luxury Levy",
+      "amount": 100
+    },
+    {
+      "id": "skyline-tower",
+      "index": 39,
+      "type": "street",
+      "name": "Skyline Tower",
+      "shortName": "Skyline Tower",
+      "group": "navy",
+      "price": 400,
+      "rent": [
+        50,
+        200,
+        600,
+        1400,
+        1700,
+        2000
+      ],
+      "houseCost": 200,
+      "mortgage": 200
+    }
+  ]
+}

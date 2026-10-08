@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "chance": [
+    { "id": "f-go", "title": "Fresh Start", "text": "Advance to GO and collect $200.", "effect": { "kind": "advance", "to": 0 } },
+    { "id": "f-ember", "title": "Dinner Reservation", "text": "Advance to Ember Plaza. Collect $200 if you pass GO.", "effect": { "kind": "advance", "to": 24 } },
+    { "id": "f-rose", "title": "Garden Tour", "text": "Advance to Rose Garden. Collect $200 if you pass GO.", "effect": { "kind": "advance", "to": 11 } },
+    { "id": "f-utility", "title": "Power Outage", "text": "Advance to the nearest utility. If owned, pay the owner 10x your dice roll.", "effect": { "kind": "advance_nearest", "target": "utility", "diceMultiplier": 10 } },
+    { "id": "f-transit-1", "title": "Express Service", "text": "Advance to the nearest transit stop. If owned, pay the owner double rent.", "effect": { "kind": "advance_nearest", "target": "transport", "rentMultiplier": 2 } },
+    { "id": "f-transit-2", "title": "Rush Hour", "text": "Advance to the nearest transit stop. If owned, pay the owner double rent.", "effect": { "kind": "advance_nearest", "target": "transport", "rentMultiplier": 2 } },
+    { "id": "f-dividend", "title": "Startup Dividend", "text": "Your startup pays a dividend. Collect $50.", "effect": { "kind": "collect", "amount": 50 } },
+    { "id": "f-jail-free", "title": "Lucky Break", "text": "Get Out of Jail Free. Keep this card until you need it or trade it.", "effect": { "kind": "jail_free" } },
+    { "id": "f-back-3", "title": "Wrong Turn", "text": "Go back 3 spaces.", "effect": { "kind": "move", "steps": -3 } },
+    { "id": "f-jail", "title": "Caught Jaywalking", "text": "Go directly to Jail. Do not pass GO, do not collect $200.", "effect": { "kind": "go_to_jail" } },
+    { "id": "f-repairs", "title": "City Inspection", "text": "Pay $25 for each house and $100 for each hotel you own.", "effect": { "kind": "repairs", "perHouse": 25, "perHotel": 100 } },
+    { "id": "f-ticket", "title": "Parking Ticket", "text": "Pay a $15 parking ticket.", "effect": { "kind": "pay", "amount": 15 } },
+    { "id": "f-northgate", "title": "Weekend Getaway", "text": "Take a trip to Northgate Station. Collect $200 if you pass GO.", "effect": { "kind": "advance", "to": 5 } },
+    { "id": "f-skyline", "title": "Penthouse Viewing", "text": "Advance to Skyline Tower.", "effect": { "kind": "advance", "to": 39 } },
+    { "id": "f-chair", "title": "Neighborhood Chair", "text": "You were elected neighborhood chair. Pay each player $50.", "effect": { "kind": "pay_each", "amount": 50 } },
+    { "id": "f-bond", "title": "Savings Bond", "text": "Your savings bond matures. Collect $150.", "effect": { "kind": "collect", "amount": 150 } }
+  ],
+  "community": [
+    { "id": "c-go", "title": "Community Spirit", "text": "Advance to GO and collect $200.", "effect": { "kind": "advance", "to": 0 } },
+    { "id": "c-rounding", "title": "Rounding Error", "text": "A bank rounding error in your favor. Collect $200.", "effect": { "kind": "collect", "amount": 200 } },
+    { "id": "c-vet", "title": "Vet Bill", "text": "Your pet needs a check-up. Pay $50.", "effect": { "kind": "pay", "amount": 50 } },
+    { "id": "c-yard-sale", "title": "Yard Sale", "text": "You sold some old furniture. Collect $50.", "effect": { "kind": "collect", "amount": 50 } },
+    { "id": "c-jail-free", "title": "Good Neighbor", "text": "A neighbor vouches for you. Get Out of Jail Free.", "effect": { "kind": "jail_free" } },
+    { "id": "c-jail", "title": "Fireworks Without a Permit", "text": "Go directly to Jail. Do not pass GO, do not collect $200.", "effect": { "kind": "go_to_jail" } },
+    { "id": "c-holiday", "title": "Holiday Club", "text": "Your holiday savings club pays out. Collect $100.", "effect": { "kind": "collect", "amount": 100 } },
+    { "id": "c-refund", "title": "Tax Refund", "text": "Tax refund. Collect $20.", "effect": { "kind": "collect", "amount": 20 } },
+    { "id": "c-birthday", "title": "Birthday Party", "text": "It's your birthday! Collect $10 from every player.", "effect": { "kind": "collect_each", "amount": 10 } },
+    { "id": "c-insurance", "title": "Policy Matures", "text": "Your insurance policy matures. Collect $100.", "effect": { "kind": "collect", "amount": 100 } },
+    { "id": "c-clinic", "title": "Clinic Visit", "text": "Clinic visit. Pay $100.", "effect": { "kind": "pay", "amount": 100 } },
+    { "id": "c-school", "title": "School Trip", "text": "School trip fees. Pay $50.", "effect": { "kind": "pay", "amount": 50 } },
+    { "id": "c-consulting", "title": "Design Consulting", "text": "You did some design consulting. Collect $25.", "effect": { "kind": "collect", "amount": 25 } },
+    { "id": "c-street-repairs", "title": "Street Repairs", "text": "Street repairs: pay $40 for each house and $115 for each hotel you own.", "effect": { "kind": "repairs", "perHouse": 40, "perHotel": 115 } },
+    { "id": "c-sandcastle", "title": "Sandcastle Contest", "text": "Second prize in a sandcastle contest. Collect $10.", "effect": { "kind": "collect", "amount": 10 } },
+    { "id": "c-inheritance", "title": "Inheritance", "text": "You inherit $100.", "effect": { "kind": "collect", "amount": 100 } }
+  ]
+}

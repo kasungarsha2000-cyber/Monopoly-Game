@@ -1,0 +1,14 @@
+node_modules/
+dist/
+apps/web/dist/
+apps/server/dist/
+apps/server/data/saves/*.json
+apps/server/data/saves/*.bak
+apps/server/data/saves/*.tmp
+!apps/server/data/saves/.gitkeep
+test-results/
+playwright-report/
+coverage/
+*.log
+.env
+.DS_Store
