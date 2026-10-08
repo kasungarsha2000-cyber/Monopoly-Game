@@ -89,7 +89,8 @@ export async function createGameServer(opts: GameServerOptions): Promise<GameSer
   const http = createServer((req, res) => {
     const path = (req.url ?? '/').split('?')[0];
     if (path === '/health') {
-      res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      // Public, non-sensitive status; CORS lets a page on another LAN address check reachability.
+      res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify({ ok: true, name: 'property-empire', version: SERVER_VERSION, protocol: PROTOCOL_VERSION, rooms: rooms.rooms.size, uptime: Math.round(process.uptime()) }));
       return;
     }

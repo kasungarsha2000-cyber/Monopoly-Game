@@ -131,7 +131,7 @@ describe('LAN server', () => {
     expect((await idle.next('ACTION_REJECTED')).reason).toMatch(/not your turn/i);
 
     // Client-authored dice are malformed and never reach the engine.
-    active.send({ type: 'REQUEST_ACTION', id: 'x2', action: { type: 'ROLL', dice: [6, 6] } });
+    active.send({ type: 'REQUEST_ACTION', id: 'x2', action: { type: 'ROLL', dice: [6, 6] } } as Record<string, unknown>);
     expect((await active.next('ERROR')).reason).toMatch(/Malformed/);
 
     active.send({ type: 'REQUEST_ACTION', id: 'roll-1', action: { type: 'ROLL' } });
@@ -201,7 +201,7 @@ describe('LAN server', () => {
     const c = await connect(server);
     c.sendRaw('{not json');
     expect((await c.next('ERROR')).reason).toMatch(/Malformed/);
-    c.send({ type: 'JOIN_REQUEST', create: true, name: 'A', evil: true });
+    c.send({ type: 'JOIN_REQUEST', create: true, name: 'A', evil: true } as Record<string, unknown>);
     expect((await c.next('ERROR')).reason).toMatch(/Malformed/);
     c.send({ type: 'REQUEST_ACTION', id: 'z', action: { type: 'ROLL' } });
     expect((await c.next('ERROR')).reason).toMatch(/Join a room/);

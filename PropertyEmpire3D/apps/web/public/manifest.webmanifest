@@ -1,0 +1,11 @@
+{
+  "name": "Property Empire 3D",
+  "short_name": "Property Empire",
+  "description": "A friendly 3D property trading board game with bots and LAN multiplayer.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F5F0E6",
+  "theme_color": "#F5F0E6",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

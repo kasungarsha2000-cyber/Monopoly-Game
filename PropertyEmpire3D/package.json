@@ -28,7 +28,7 @@
     "test": "vitest run",
     "test:core": "vitest run packages/game-core",
     "test:network": "vitest run tests/network",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && playwright test",
     "test:all": "npm run typecheck && npm run test && npm run build && npm run test:e2e",
     "simulate": "tsx scripts/simulate.ts"
   },
