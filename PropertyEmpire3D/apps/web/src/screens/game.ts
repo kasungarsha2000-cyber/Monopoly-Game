@@ -472,7 +472,12 @@ class GameView {
     this.banner.append(h('span', { class: 'who' }, who), h('span', { class: 'what' }, `· ${what}`));
     if (dice) this.banner.append(dice);
     else if (st.turn.dice) this.setBannerDice(st.turn.dice);
-    this.roundPill.textContent = `Round ${st.round}${st.config.maxRounds ? ` / ${st.config.maxRounds}` : ''}`;
+    this.roundPill.textContent = `Round ${this.roundOf(st)}${st.config.maxRounds ? ` / ${st.config.maxRounds}` : ''}`;
+  }
+
+  /** Rounds played, capped at the limit (the counter passes it when a round-limited game ends). */
+  private roundOf(st: GameState): number {
+    return st.config.maxRounds ? Math.min(st.round, st.config.maxRounds) : st.round;
   }
 
   private renderPlayers(st: GameState): void {
@@ -815,6 +820,8 @@ class GameView {
   private showResults(force = false): void {
     if (this.resultsShown && !force) return;
     this.resultsShown = true;
+    // Clear transient overlays so nothing covers the results.
+    for (const el of Array.from(document.querySelectorAll('.card-popup, .toast, .overlay-banner'))) el.remove();
     const st = this.display;
     const ranking = rankPlayers(st, this.ctx);
     const m = modal('Results', { wide: true, testid: 'results' });
@@ -853,7 +860,7 @@ class GameView {
       );
     });
     table.append(tbody);
-    m.body.append(table, h('p', { class: 'muted small-text' }, `${st.turn.number} turns played over ${st.round} rounds.`));
+    m.body.append(table, h('p', { class: 'muted small-text' }, `${st.turn.number} turns played over ${this.roundOf(st)} rounds.`));
     m.foot.append(
       button('View board', () => m.close(), { variant: 'ghost' }),
       button('Main menu', () => {

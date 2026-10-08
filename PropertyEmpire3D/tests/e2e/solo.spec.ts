@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { autoPlay, info, trackErrors, waitForGame, waitForMyMove, waitIdle } from './helpers';
+import { act, autoPlay, info, pickAction, trackErrors, waitForGame, waitForMyMove, waitIdle } from './helpers';
 
 test.describe('solo play', () => {
   test('a human plays against bots with real buttons, entirely in the browser (no WebSocket)', async ({ page }) => {
@@ -66,8 +66,17 @@ test.describe('solo play', () => {
     await page.getByTestId('menu-solo').click();
     await page.getByTestId('start-solo').click();
     await waitForGame(page);
-    await waitForMyMove(page);
-    const before = (await info(page)).revision;
+    // Advance until rolling is legal (our first move may be an auction bid or a trade reply).
+    let s0 = await waitForMyMove(page);
+    for (let k = 0; k < 30 && !s0.legal.canRoll; k++) {
+      const a = pickAction(s0);
+      if (!a) break;
+      await act(page, a);
+      await page.waitForFunction((rev) => (window as unknown as { __pe: { display: () => { revision: number } } }).__pe.display().revision > rev, s0.revision);
+      s0 = await waitForMyMove(page);
+    }
+    expect(s0.legal.canRoll).toBe(true);
+    const before = s0.revision;
     await page.keyboard.press('Space');
     await expect.poll(async () => (await info(page)).revision).toBeGreaterThan(before);
     await waitIdle(page);

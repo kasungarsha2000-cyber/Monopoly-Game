@@ -1301,7 +1301,7 @@ input[type='checkbox'] {
   border: 3px solid var(--purple);
   padding: 18px;
   text-align: center;
-  z-index: 25;
+  z-index: 15;
   animation: cardIn 0.35s ease;
   cursor: pointer;
 }
