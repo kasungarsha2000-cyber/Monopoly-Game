@@ -31,7 +31,7 @@ Health check; room creation and join by code; lobby updates for all clients; unk
 - `lan.spec.ts`: two browser contexts host and join (invite link), add a bot, start, play several turns and converge on the same state; a guest reload rejoins the same seat; wrong codes are reported; a page from another origin cannot open a WebSocket.
 - `mobile.spec.ts` (Pixel 7 profile): no horizontal overflow, bottom-bar buttons on screen and touch-sized, touch play, touch taps select tiles.
 
-Browser tests use `?e2e=1`, which only makes animations instant, speeds up local bots and exposes a read-only `window.__pe` helper (plus `act`, which goes through the same validated `dispatch` path as the buttons). It is never enabled without the query parameter.
+Browser tests use `?e2e=1`, which only makes animations instant, speeds up local bots and exposes a read-only `window.__pe` helper (plus `act`, which goes through the same validated `dispatch` path as the buttons) and `window.__pe3d` (the renderer, for graphics debugging). Neither is enabled without the query parameter.
 
 ## Not automated
 

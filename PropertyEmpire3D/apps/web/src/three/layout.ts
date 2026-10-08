@@ -131,7 +131,7 @@ export function tokenPosition(index: number, slot: number, count: number, inJail
 export function buildingPosition(index: number, k: number): { x: number; z: number; rotY: number } {
   const r = tileRect(index);
   const bandDepth = CORNER * 0.22;
-  const along = k === 4 ? 0 : (k - 1.5) * 0.22;
+  const along = k === 4 ? 0 : (k - 1.5) * 0.225;
   const ex = -r.inZ;
   const ez = r.inX;
   const toBand = CORNER / 2 - bandDepth / 2;

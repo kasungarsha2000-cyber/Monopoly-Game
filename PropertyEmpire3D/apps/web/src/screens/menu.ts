@@ -53,7 +53,7 @@ function demo(app: App): GameState {
 export function menuScreen(app: App): () => void {
   const r = app.ensureRenderer();
   if (r) {
-    r.setInsets({ left: 0, right: 0, top: 0, bottom: 0 });
+    r.setInsets({ left: 0, right: 0, top: 0, bottom: 0 }, 0.82);
     r.syncState(demo(app));
     r.setSelected(null);
     r.setHighlights([]);

@@ -29,6 +29,8 @@ export class CameraRig {
   private insets: Insets = { left: 0, right: 0, top: 0, bottom: 0 };
   rotateEnabled = true;
   invert = false;
+  /** Default tilt; portrait phones use a more top-down view to fill the screen. */
+  defaultPolar = 0.82;
 
   constructor() {
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
@@ -46,6 +48,14 @@ export class CameraRig {
     this.refit();
   }
 
+  /** Change the default tilt (and apply it now). */
+  setDefaultPolar(polar: number): void {
+    if (Math.abs(this.defaultPolar - polar) < 1e-3) return;
+    this.defaultPolar = polar;
+    this.polar = polar;
+    this.refit();
+  }
+
   /** Recompute the zoom that shows the whole board inside the free area. */
   private refit(): void {
     const freeW = Math.max(120, this.width - this.insets.left - this.insets.right);
@@ -56,8 +66,8 @@ export class CameraRig {
     const fy = freeH / this.height;
     const aspect = this.width / this.height;
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
-    const needW = (BOARD * 1.08) / 2 / Math.tan((hfov * fx) / 2);
-    const needH = (BOARD * 0.95 * Math.cos(this.polar * 0.6)) / 2 / Math.tan((vfov * fy) / 2);
+    const needW = (BOARD * 1.06) / 2 / Math.tan((hfov * fx) / 2);
+    const needH = (BOARD * 0.86 * Math.cos(this.polar * 0.6)) / 2 / Math.tan((vfov * fy) / 2);
     const prevFit = this.fitRadius;
     this.fitRadius = THREE.MathUtils.clamp(Math.max(needW, needH), 9, 40);
     // Keep the user's zoom relative to the fitted distance.
@@ -134,7 +144,7 @@ export class CameraRig {
   }
 
   reset(tweens: Tweens, durationMs: number): Promise<void> {
-    return this.animateTo(tweens, { target: new THREE.Vector3(0, 0, 0), radius: this.fitRadius, azimuth: 0, polar: 0.82 }, durationMs);
+    return this.animateTo(tweens, { target: new THREE.Vector3(0, 0, 0), radius: this.fitRadius, azimuth: 0, polar: this.defaultPolar }, durationMs);
   }
 
   get defaultRadius(): number {

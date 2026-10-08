@@ -118,3 +118,17 @@ export async function autoPlay(page: Page, n: number): Promise<PeInfo> {
   }
   return info(page);
 }
+
+/** Play the local player's non-roll decisions (auction bids, trade replies) until rolling is legal. */
+export async function waitUntilCanRoll(page: Page): Promise<PeInfo> {
+  let s = await waitForMyMove(page);
+  for (let k = 0; k < 40 && !s.legal.canRoll; k++) {
+    const a = pickAction(s);
+    if (!a) break;
+    await act(page, a);
+    await page.waitForFunction((rev) => (window as unknown as { __pe: { display: () => { revision: number } } }).__pe.display().revision > rev, s.revision);
+    s = await waitForMyMove(page);
+  }
+  expect(s.legal.canRoll).toBe(true);
+  return s;
+}

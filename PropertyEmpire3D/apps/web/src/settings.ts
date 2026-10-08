@@ -21,7 +21,11 @@ export interface Settings {
   mobilePreset: boolean;
   playerName: string;
   playerToken: string;
+  /** Bumped when graphics defaults change so old saved presets are refreshed once. */
+  graphicsVersion: number;
 }
+
+const GRAPHICS_VERSION = 2;
 
 const KEY = 'pe.settings.v1';
 
@@ -37,7 +41,7 @@ function defaults(): Settings {
     musicVolume: 0.25,
     effectsVolume: 0.8,
     animationSpeed: reduced ? 'reduced' : 'normal',
-    graphicsQuality: mobile ? 'low' : 'medium',
+    graphicsQuality: mobile ? 'medium' : 'high',
     cameraRotate: true,
     invertCamera: false,
     reducedMotion: reduced,
@@ -45,7 +49,8 @@ function defaults(): Settings {
     pixelDensity: 'auto',
     mobilePreset: true,
     playerName: '',
-    playerToken: 'pawn'
+    playerToken: 'pawn',
+    graphicsVersion: GRAPHICS_VERSION
   };
 }
 
@@ -64,6 +69,12 @@ class SettingsStore {
         const merged = { ...d } as Settings;
         for (const k of Object.keys(d) as (keyof Settings)[]) {
           if (parsed[k] !== undefined && typeof parsed[k] === typeof d[k]) (merged as unknown as Record<string, unknown>)[k] = parsed[k];
+        }
+        if (merged.graphicsVersion !== GRAPHICS_VERSION) {
+          // Earlier versions defaulted phones to Low (blurry at 1x); move everyone to the new defaults.
+          merged.graphicsQuality = d.graphicsQuality;
+          merged.pixelDensity = 'auto';
+          merged.graphicsVersion = GRAPHICS_VERSION;
         }
         this.value = merged;
       }
@@ -99,7 +110,9 @@ class SettingsStore {
 
   /** Graphics preset actually used (phones get Low when the mobile preset is on). */
   effectiveQuality(): GraphicsQuality {
-    return this.value.mobilePreset && isMobileDevice() ? 'low' : this.value.graphicsQuality;
+    // On phones the mobile preset caps quality at Medium (sharp, but lighter on battery).
+    if (this.value.mobilePreset && isMobileDevice() && this.value.graphicsQuality === 'high') return 'medium';
+    return this.value.graphicsQuality;
   }
 
   /** Multiplier applied to animation durations (0 = instant). */

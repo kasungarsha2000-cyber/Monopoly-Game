@@ -45,6 +45,7 @@ export class App {
     } catch (e) {
       this.rendererError = (e as Error).message || 'WebGL is not available';
     }
+    if (this.e2e && this.renderer) (window as unknown as Record<string, unknown>).__pe3d = this.renderer;
     return this.renderer;
   }
 

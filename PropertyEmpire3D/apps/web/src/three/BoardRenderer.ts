@@ -11,7 +11,10 @@ import { BOARD, CORNER, buildingPosition, tileAt, tileRect, tokenPosition } from
 import { CameraRig, type Insets } from './camera';
 import { Tweens, ease } from './tween';
 import { Dice } from './dice';
-import { colorMaterial, hotelGeometry, houseGeometry, tokenGeometry } from './meshes';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { buildingMaterial, colorMaterial, hotelGeometry, houseGeometry, setMaterialQuality, tokenGeometry, tokenMaterial } from './meshes';
+import { backgroundTexture, blobTexture, woodTexture } from './textures';
 import type { GraphicsQuality } from '../settings';
 
 export interface RendererOptions {
@@ -22,7 +25,11 @@ export interface RendererOptions {
 }
 
 interface TokenEntry {
-  mesh: THREE.Mesh;
+  /** Positioned on the board (x/z and facing). */
+  mesh: THREE.Group;
+  /** The token body; its y offset is the hop height. */
+  body: THREE.Mesh;
+  blob: THREE.Mesh;
   token: TokenId;
   color: string;
   index: number;
@@ -31,6 +38,11 @@ interface TokenEntry {
 
 const BOARD_TOP = 0;
 const PARTICLES = 48;
+
+/** True on phones/tablets with small screens (used to pick texture sizes). */
+function isSmallTouchDevice(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 820;
+}
 
 function frameTexture(): THREE.CanvasTexture {
   const s = 128;
@@ -59,11 +71,14 @@ export class BoardRenderer {
   private opts: RendererOptions;
   private boardMaterial: THREE.MeshStandardMaterial;
   private sun: THREE.DirectionalLight;
+  private blobMap = blobTexture();
+  private blobGeo = new THREE.PlaneGeometry(0.62, 0.62);
+  private materialQuality: GraphicsQuality | null = null;
   private tokens = new Map<string, TokenEntry>();
   private buildings = new Map<number, { houses: number; group: THREE.Group }>();
   private ownerStrips = new Map<number, THREE.Mesh>();
   private mortgageDims = new Map<number, THREE.Mesh>();
-  private stripGeo: THREE.BoxGeometry;
+  private stripGeo: THREE.BufferGeometry;
   private dimGeo: THREE.PlaneGeometry;
   private selection: THREE.Mesh;
   private hover: THREE.Mesh;
@@ -90,9 +105,11 @@ export class BoardRenderer {
     this.container = container;
     this.board = board;
     this.opts = opts;
-    this.renderer = new THREE.WebGLRenderer({ antialias: opts.quality !== 'low', alpha: true, powerPreference: 'high-performance' });
-    this.renderer.setClearColor(0x000000, 0);
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Neutral tone mapping keeps the palette's colors while handling highlights gracefully.
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.append(this.renderer.domElement);
     this.renderer.domElement.setAttribute('tabindex', '-1');
@@ -102,34 +119,72 @@ export class BoardRenderer {
       this.opts.onContextLost?.();
     });
 
-    // Lights.
-    this.scene.add(new THREE.HemisphereLight(0xfff8ec, 0xb9a57a, 1.15));
-    this.sun = new THREE.DirectionalLight(0xffffff, 1.6);
-    this.sun.position.set(-6, 14, 8);
-    this.sun.shadow.camera.left = -9;
-    this.sun.shadow.camera.right = 9;
-    this.sun.shadow.camera.top = 9;
-    this.sun.shadow.camera.bottom = -9;
-    this.sun.shadow.camera.near = 1;
-    this.sun.shadow.camera.far = 40;
-    this.sun.shadow.bias = -0.0008;
-    this.scene.add(this.sun);
+    // Image-based lighting from a procedural room (no downloads) gives soft
+    // reflections on glossy tokens, dice and buildings.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const envScene = new RoomEnvironment();
+    this.scene.environment = pmrem.fromScene(envScene, 0.04).texture;
+    this.scene.environmentIntensity = 0.32;
+    envScene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) {
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+      }
+    });
+    pmrem.dispose();
+    this.scene.background = backgroundTexture('#F4ECDD', '#CDB894');
+    this.scene.fog = new THREE.Fog(0xd8c6a4, 34, 70);
 
-    // Table and board.
-    const table = new THREE.Mesh(new THREE.CircleGeometry(26, 48), new THREE.MeshStandardMaterial({ color: 0xd9c9a6, roughness: 0.95 }));
+    // Lights: warm key light with shadows, cool soft fill, gentle sky bounce.
+    this.scene.add(new THREE.HemisphereLight(0xfff6e8, 0x8a6f4a, 0.3));
+    this.sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
+    this.sun.position.set(-7, 16, 9);
+    this.sun.shadow.camera.left = -8.5;
+    this.sun.shadow.camera.right = 8.5;
+    this.sun.shadow.camera.top = 8.5;
+    this.sun.shadow.camera.bottom = -8.5;
+    this.sun.shadow.camera.near = 4;
+    this.sun.shadow.camera.far = 40;
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.02;
+    this.sun.shadow.radius = 3;
+    this.scene.add(this.sun);
+    const fill = new THREE.DirectionalLight(0xdfe9ff, 0.45);
+    fill.position.set(9, 7, -6);
+    this.scene.add(fill);
+
+    // Wooden table.
+    const tableTex = woodTexture({ width: 1024, height: 1024, base: '#B88A5A', planks: 8, seed: 11 }, 3, 3);
+    const table = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.MeshStandardMaterial({ map: tableTex, roughness: 0.7, metalness: 0 }));
     table.rotation.x = -Math.PI / 2;
-    table.position.y = -0.36;
+    table.position.y = -0.42;
     table.receiveShadow = true;
     this.scene.add(table);
-    const base = new THREE.Mesh(
-      new THREE.BoxGeometry(BOARD + 0.36, 0.34, BOARD + 0.36),
-      new THREE.MeshStandardMaterial({ color: 0x9c7b52, roughness: 0.7 })
-    );
-    base.position.y = -0.18;
+
+    // Board: rounded walnut frame with a raised rim around the printed surface.
+    const woodFrameTex = woodTexture({ width: 1024, height: 256, base: '#6E4A2C', planks: 3, seed: 5, grain: 40 }, 2, 1);
+    const frameMat = new THREE.MeshStandardMaterial({ map: woodFrameTex, roughness: 0.5, metalness: 0 });
+    const base = new THREE.Mesh(new RoundedBoxGeometry(BOARD + 0.7, 0.42, BOARD + 0.7, 4, 0.12), frameMat);
+    base.position.y = -0.21;
     base.castShadow = true;
     base.receiveShadow = true;
     this.scene.add(base);
-    this.boardMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
+    const rimGeoX = new RoundedBoxGeometry(BOARD + 0.7, 0.08, 0.3, 3, 0.03);
+    const rimGeoZ = new RoundedBoxGeometry(0.3, 0.08, BOARD + 0.1, 3, 0.03);
+    for (const [geo, x, z] of [
+      [rimGeoX, 0, BOARD / 2 + 0.2],
+      [rimGeoX, 0, -BOARD / 2 - 0.2],
+      [rimGeoZ, BOARD / 2 + 0.2, 0],
+      [rimGeoZ, -BOARD / 2 - 0.2, 0]
+    ] as [THREE.BufferGeometry, number, number][]) {
+      const rim = new THREE.Mesh(geo, frameMat);
+      rim.position.set(x, 0.0, z);
+      rim.castShadow = true;
+      rim.receiveShadow = true;
+      this.scene.add(rim);
+    }
+    this.boardMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, metalness: 0 });
     const top = new THREE.Mesh(new THREE.PlaneGeometry(BOARD, BOARD), this.boardMaterial);
     top.rotation.x = -Math.PI / 2;
     top.position.y = BOARD_TOP + 0.002;
@@ -137,7 +192,7 @@ export class BoardRenderer {
     this.scene.add(top);
 
     // Ownership strips sit on the outer edge of each ownable tile.
-    this.stripGeo = new THREE.BoxGeometry(0.86, 0.03, 0.09);
+    this.stripGeo = new RoundedBoxGeometry(0.86, 0.035, 0.1, 2, 0.015);
     this.dimGeo = new THREE.PlaneGeometry(1, 1);
 
     // Selection, hover and current-player markers.
@@ -194,27 +249,43 @@ export class BoardRenderer {
   private applyQuality(): void {
     const q = this.opts.quality;
     const dpr = window.devicePixelRatio || 1;
-    const cap = this.opts.pixelDensity === 'auto' ? (q === 'low' ? 1 : q === 'medium' ? 1.5 : 2) : Number(this.opts.pixelDensity);
+    // Device pixel ratio is capped at 2 (brief); Low still renders above 1x so phones stay sharp.
+    const cap = this.opts.pixelDensity === 'auto' ? (q === 'low' ? 1.5 : 2) : Number(this.opts.pixelDensity);
     this.renderer.setPixelRatio(Math.min(dpr, cap, 2));
     this.renderer.shadowMap.enabled = q !== 'low';
     this.sun.castShadow = q !== 'low';
-    const shadowSize = q === 'high' ? 2048 : 1024;
+    const shadowSize = q === 'high' ? 4096 : 2048;
     if (this.sun.shadow.mapSize.x !== shadowSize) {
       this.sun.shadow.mapSize.set(shadowSize, shadowSize);
       this.sun.shadow.map?.dispose();
       this.sun.shadow.map = null;
     }
+    // Board artwork resolution: 4096 on desktop Medium/High for crisp text when zoomed.
     const maxTex = this.renderer.capabilities.maxTextureSize;
-    const size = Math.min(maxTex, q === 'low' ? 1024 : 2048);
+    const wanted = q === 'low' ? 2048 : isSmallTouchDevice() ? 2048 : 4096;
+    const size = Math.min(maxTex, wanted);
     if (size !== this.textureSize || !this.boardMaterial.map) {
       this.textureSize = size;
       const tex = new THREE.CanvasTexture(paintBoard(this.board, size));
       tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+      tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+      tex.generateMipmaps = true;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
       this.boardMaterial.map?.dispose();
       this.boardMaterial.map = tex;
       this.boardMaterial.needsUpdate = true;
     }
+    // Materials: clearcoat enamel on Medium/High.
+    if (this.materialQuality !== q) {
+      this.materialQuality = q;
+      setMaterialQuality(q);
+      for (const e of this.tokens.values()) e.body.material = tokenMaterial(e.color);
+      for (const b of this.buildings.values()) b.group.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) m.material = buildingMaterial();
+      });
+    }
+    this.scene.environmentIntensity = q === 'low' ? 0.55 : 0.32;
     this.invalidate();
   }
 
@@ -226,7 +297,8 @@ export class BoardRenderer {
     this.invalidate();
   }
 
-  setInsets(insets: Insets): void {
+  setInsets(insets: Insets, defaultPolar = 0.82): void {
+    this.rig.setDefaultPolar(defaultPolar);
     this.rig.setInsets(insets);
     this.invalidate();
   }
@@ -264,7 +336,7 @@ export class BoardRenderer {
     if (on) {
       this.rig.polar = 0.95;
       this.rig.target.set(0, 0, 0);
-      this.rig.radius = this.rig.defaultRadius * 0.95;
+      this.rig.radius = this.rig.defaultRadius * 1.08;
       this.selection.visible = false;
       this.hover.visible = false;
     }
@@ -463,11 +535,18 @@ export class BoardRenderer {
       let entry = this.tokens.get(p.id);
       if (!entry || entry.token !== p.token || entry.color !== p.color) {
         if (entry) this.scene.remove(entry.mesh);
-        const mesh = new THREE.Mesh(tokenGeometry(p.token), colorMaterial(p.color, { roughness: 0.35, metalness: 0.1 }));
-        mesh.castShadow = true;
+        const mesh = new THREE.Group();
         mesh.name = `token-${p.id}`;
+        const body = new THREE.Mesh(tokenGeometry(p.token), tokenMaterial(p.color));
+        body.scale.setScalar(1.15);
+        body.castShadow = true;
+        const blob = new THREE.Mesh(this.blobGeo, new THREE.MeshBasicMaterial({ map: this.blobMap, transparent: true, depthWrite: false }));
+        blob.rotation.x = -Math.PI / 2;
+        blob.position.y = 0.004;
+        blob.renderOrder = 1;
+        mesh.add(blob, body);
         this.scene.add(mesh);
-        entry = { mesh, token: p.token, color: p.color, index: p.position, inJail: p.inJail };
+        entry = { mesh, body, blob, token: p.token, color: p.color, index: p.position, inJail: p.inJail };
         this.tokens.set(p.id, entry);
       }
       entry.index = p.position;
@@ -577,12 +656,15 @@ export class BoardRenderer {
       return Promise.resolve();
     }
     const group = new THREE.Group();
-    const add = (geo: THREE.BufferGeometry, color: string, k: number) => {
-      const m = new THREE.Mesh(geo, colorMaterial(color, { roughness: 0.5 }));
+    const add = (geo: THREE.BufferGeometry, _color: string, k: number) => {
+      const m = new THREE.Mesh(geo, buildingMaterial());
       const pos = buildingPosition(index, k);
       m.position.set(pos.x, BOARD_TOP, pos.z);
       m.rotation.y = pos.rotY;
+      m.userData.baseScale = k === 4 ? 1.12 : 1.25;
+      m.scale.setScalar(m.userData.baseScale as number);
       m.castShadow = true;
+      m.receiveShadow = true;
       group.add(m);
       return m;
     };
@@ -599,7 +681,7 @@ export class BoardRenderer {
       return Promise.resolve();
     }
     for (const m of fresh) m.scale.setScalar(0.001);
-    const p = this.tweens.run(durationMs, (t) => fresh.forEach((m) => m.scale.setScalar(Math.max(0.001, t))), ease.outBack);
+    const p = this.tweens.run(durationMs, (t) => fresh.forEach((m) => m.scale.setScalar(Math.max(0.001, t * (m.userData.baseScale as number)))), ease.outBack);
     this.invalidate();
     return p;
   }
@@ -613,6 +695,8 @@ export class BoardRenderer {
     const e = this.tokens.get(playerId);
     if (!e) return;
     const mesh = e.mesh;
+    const body = e.body;
+    const blobMat = e.blob.material as THREE.MeshBasicMaterial;
     const hopTo = (target: number, dur: number, height: number, jail = false) => {
       const start = mesh.position.clone();
       const end = tokenPosition(target, 0, 1, jail);
@@ -625,7 +709,10 @@ export class BoardRenderer {
         (t) => {
           mesh.position.x = start.x + (end.x - start.x) * t;
           mesh.position.z = start.z + (end.z - start.z) * t;
-          mesh.position.y = BOARD_TOP + Math.sin(t * Math.PI) * height;
+          const lift = Math.sin(t * Math.PI) * height;
+          body.position.y = lift;
+          e.blob.scale.setScalar(1 + lift * 0.8);
+          blobMat.opacity = Math.max(0.25, 1 - lift * 0.9);
           mesh.rotation.y = rotStart + (rotEnd - rotStart) * t;
           if (this.currentRing.visible) this.currentRing.position.set(mesh.position.x, BOARD_TOP + 0.01, mesh.position.z);
         },

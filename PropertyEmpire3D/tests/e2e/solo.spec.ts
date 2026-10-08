@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { act, autoPlay, info, pickAction, trackErrors, waitForGame, waitForMyMove, waitIdle } from './helpers';
+import { autoPlay, info, trackErrors, waitForGame, waitForMyMove, waitIdle, waitUntilCanRoll } from './helpers';
 
 test.describe('solo play', () => {
   test('a human plays against bots with real buttons, entirely in the browser (no WebSocket)', async ({ page }) => {
@@ -14,7 +14,7 @@ test.describe('solo play', () => {
     await waitForGame(page);
 
     // Play our first turn with the visible controls.
-    let s = await waitForMyMove(page);
+    let s = await waitUntilCanRoll(page);
     expect(s.players).toHaveLength(4);
     expect(s.players[0]?.name).toBe('Tester');
     await expect(page.getByTestId('btn-roll')).toBeEnabled();
@@ -66,16 +66,8 @@ test.describe('solo play', () => {
     await page.getByTestId('menu-solo').click();
     await page.getByTestId('start-solo').click();
     await waitForGame(page);
-    // Advance until rolling is legal (our first move may be an auction bid or a trade reply).
-    let s0 = await waitForMyMove(page);
-    for (let k = 0; k < 30 && !s0.legal.canRoll; k++) {
-      const a = pickAction(s0);
-      if (!a) break;
-      await act(page, a);
-      await page.waitForFunction((rev) => (window as unknown as { __pe: { display: () => { revision: number } } }).__pe.display().revision > rev, s0.revision);
-      s0 = await waitForMyMove(page);
-    }
-    expect(s0.legal.canRoll).toBe(true);
+    // Our first move may be an auction bid or a trade reply; get to a roll first.
+    const s0 = await waitUntilCanRoll(page);
     const before = s0.revision;
     await page.keyboard.press('Space');
     await expect.poll(async () => (await info(page)).revision).toBeGreaterThan(before);

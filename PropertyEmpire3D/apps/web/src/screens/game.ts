@@ -210,10 +210,12 @@ class GameView {
     const mobile = w <= 720 || (hgt <= 520 && w <= 1000);
     if (mobile) {
       const landscape = hgt <= 520;
-      // Portrait: players strip on top, bottom bar plus a bottom sheet capped at 32% height.
-      r.setInsets(landscape ? { left: 0, right: 290, top: 50, bottom: 70 } : { left: 0, right: 0, top: 112, bottom: Math.round(hgt * 0.32) + 84 });
+      // Portrait: players strip on top; bottom bar plus the (compact) bottom sheet below.
+      // A more top-down tilt lets the board fill the phone's width.
+      if (landscape) r.setInsets({ left: 0, right: 290, top: 50, bottom: 70 }, 0.82);
+      else r.setInsets({ left: 0, right: 0, top: 112, bottom: Math.min(Math.round(hgt * 0.26), 180) + 84 }, 0.5);
     } else {
-      r.setInsets({ left: w > 900 ? 255 : 215, right: w > 900 ? 320 : 290, top: 60, bottom: 80 });
+      r.setInsets({ left: w > 900 ? 255 : 215, right: w > 900 ? 320 : 290, top: 60, bottom: 80 }, 0.82);
     }
   }
 
@@ -556,7 +558,7 @@ class GameView {
         this.panel.append(
           h('h3', {}, `Auction: ${s.name}`),
           h('p', {}, a.highestBidderId ? `Highest bid ${money(a.highestBid)} by ${this.nameOf(a.highestBidderId)}` : 'No bids yet. Minimum bid $1.'),
-          h('div', { class: 'row', style: 'margin-bottom:10px' }, ...a.bidders.map((id) => h('span', { class: `badge ${id === bidder ? 'blue' : ''}` }, this.nameOf(id))))
+          h('div', { class: 'row bidders', style: 'margin-bottom:10px' }, ...a.bidders.map((id) => h('span', { class: `badge ${id === bidder ? 'blue' : ''}` }, this.nameOf(id))))
         );
         if (legal.canPassBid) {
           const min = auctionMinBid(st);
@@ -566,7 +568,7 @@ class GameView {
           input.addEventListener('input', () => (this.bidValue = Math.floor(Number(input.value) || 0)));
           const quick = h(
             'div',
-            { class: 'row' },
+            { class: 'row bid-quick' },
             ...[1, 10, 50, 100].map((inc) =>
               button(`+${inc}`, () => {
                 this.bidValue = Math.min(max, Math.max(min, (a.highestBidderId ? a.highestBid : 0) + inc));
@@ -574,9 +576,17 @@ class GameView {
               }, { small: true, disabled: (a.highestBidderId ? a.highestBid : 0) + inc > max })
             )
           );
+          input.title = `You can bid ${money(min)} to ${money(max)}`;
           this.panel.append(
-            h('div', { class: 'actions' }, quick, input, button('Place bid', () => this.act({ type: 'BID', amount: this.bidValue }), { variant: 'primary', disabled: !legal.bid, testid: 'btn-bid' }), button('Pass', () => this.act({ type: 'PASS_BID' }), { testid: 'btn-pass' })),
-            h('p', { class: 'small-text muted' }, `You can bid ${money(min)} to ${money(max)}.`)
+            quick,
+            h(
+              'div',
+              { class: 'bid-row' },
+              input,
+              button('Place bid', () => this.act({ type: 'BID', amount: this.bidValue }), { variant: 'primary', disabled: !legal.bid, testid: 'btn-bid' }),
+              button('Pass', () => this.act({ type: 'PASS_BID' }), { testid: 'btn-pass' })
+            ),
+            h('p', { class: 'small-text muted bid-hint' }, `You can bid ${money(min)} to ${money(max)}.`)
           );
         } else {
           this.panel.append(this.waiting(`${this.nameOf(bidder)} ${actorIsBot ? 'is thinking...' : 'is bidding...'}`));

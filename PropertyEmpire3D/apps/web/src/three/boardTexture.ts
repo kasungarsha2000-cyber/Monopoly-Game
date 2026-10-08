@@ -5,11 +5,13 @@
  */
 import type { BoardDef, SpaceDef } from '@pe/game-core';
 import { BOARD, CORNER, TILE, tileRect } from './layout';
+import { paperPattern } from './textures';
 
 const INK = '#253344';
 const SURFACE = '#EFE4CB';
 const TILE_BG = '#FBF7EE';
-const LINE = '#C9B892';
+const TILE_BG_2 = '#F3EBDA';
+const LINE = '#BFA97C';
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
 const SIDE_ANGLE: Record<string, number> = { bottom: 0, left: Math.PI / 2, top: Math.PI, right: -Math.PI / 2 };
@@ -197,55 +199,73 @@ const ICONS: Record<string, (c: CanvasRenderingContext2D, s: number) => void> = 
 
 /* ------------------------------ tiles ------------------------------ */
 
+function pricePill(c: CanvasRenderingContext2D, text: string, y: number, ppu: number): void {
+  c.font = `800 ${ppu * 0.135}px ${FONT}`;
+  const w = c.measureText(text).width + ppu * 0.14;
+  const h = ppu * 0.2;
+  c.fillStyle = 'rgba(37,51,68,0.08)';
+  roundRect(c, -w / 2, y - h / 2, w, h, h / 2);
+  c.fill();
+  c.fillStyle = INK;
+  c.fillText(text, 0, y + ppu * 0.005);
+}
+
 function drawTile(c: CanvasRenderingContext2D, space: SpaceDef, groupColor: string, ppu: number): void {
   const w = TILE * ppu;
   const d = CORNER * ppu;
   const x0 = -w / 2;
   const y0 = -d / 2;
-  c.fillStyle = TILE_BG;
+  const bg = c.createLinearGradient(0, y0, 0, d / 2);
+  bg.addColorStop(0, TILE_BG);
+  bg.addColorStop(1, TILE_BG_2);
+  c.fillStyle = bg;
   c.fillRect(x0, y0, w, d);
-  c.strokeStyle = LINE;
-  c.lineWidth = Math.max(1.5, ppu * 0.012);
-  c.strokeRect(x0, y0, w, d);
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.fillStyle = INK;
-  const nameSize = ppu * 0.15;
-  const priceSize = ppu * 0.15;
+  const nameSize = ppu * 0.148;
 
   if (space.type === 'street') {
     const band = d * 0.22;
     c.fillStyle = groupColor;
     c.fillRect(x0, y0, w, band);
-    c.strokeRect(x0, y0, w, band);
+    // Gloss highlight and a crisp lower edge on the color band.
+    const gloss = c.createLinearGradient(0, y0, 0, y0 + band);
+    gloss.addColorStop(0, 'rgba(255,255,255,0.35)');
+    gloss.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+    gloss.addColorStop(1, 'rgba(0,0,0,0.12)');
+    c.fillStyle = gloss;
+    c.fillRect(x0, y0, w, band);
+    c.fillStyle = 'rgba(0,0,0,0.28)';
+    c.fillRect(x0, y0 + band - ppu * 0.012, w, ppu * 0.012);
     c.fillStyle = INK;
-    c.font = `700 ${nameSize}px ${FONT}`;
-    const lines = wrap(c, space.shortName.toUpperCase(), w * 0.9);
-    lines.forEach((l, i) => c.fillText(l, 0, y0 + band + nameSize * 1.0 + i * nameSize * 1.15));
-    c.font = `600 ${priceSize}px ${FONT}`;
-    c.fillText(`$${space.price}`, 0, d / 2 - priceSize * 1.0);
-    return;
+    c.font = `800 ${nameSize}px ${FONT}`;
+    const lines = wrap(c, space.shortName.toUpperCase(), w * 0.88);
+    lines.forEach((l, i) => c.fillText(l, 0, y0 + band + nameSize * 1.05 + i * nameSize * 1.12));
+    pricePill(c, `$${space.price}`, d / 2 - ppu * 0.17, ppu);
+  } else {
+    c.font = `800 ${nameSize}px ${FONT}`;
+    const label = space.type === 'chance' ? 'FORTUNE' : space.type === 'community' ? 'COMMUNITY' : space.shortName.toUpperCase();
+    const lines = wrap(c, label, w * 0.88);
+    lines.forEach((l, i) => c.fillText(l, 0, y0 + nameSize * 1.15 + i * nameSize * 1.12));
+    c.save();
+    c.translate(0, y0 + d * 0.56);
+    c.shadowColor = 'rgba(37,51,68,0.25)';
+    c.shadowBlur = ppu * 0.04;
+    c.shadowOffsetY = ppu * 0.015;
+    const icon =
+      ICONS[space.id] ??
+      (space.type === 'chance' ? iconQuestion : space.type === 'community' ? iconGift : space.type === 'tax' ? iconDiamond : null);
+    icon?.(c, ppu * 0.44);
+    c.restore();
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    if (space.type === 'transport' || space.type === 'utility') pricePill(c, `$${space.price}`, d / 2 - ppu * 0.17, ppu);
+    else if (space.type === 'tax') pricePill(c, `PAY $${space.amount}`, d / 2 - ppu * 0.17, ppu);
   }
-
-  c.font = `700 ${nameSize}px ${FONT}`;
-  const label = space.type === 'chance' ? 'FORTUNE' : space.type === 'community' ? 'COMMUNITY' : space.shortName.toUpperCase();
-  const lines = wrap(c, label, w * 0.9);
-  lines.forEach((l, i) => c.fillText(l, 0, y0 + nameSize * 1.1 + i * nameSize * 1.15));
-  c.save();
-  c.translate(0, y0 + d * 0.55);
-  const icon =
-    ICONS[space.id] ??
-    (space.type === 'chance' ? iconQuestion : space.type === 'community' ? iconGift : space.type === 'tax' ? iconDiamond : null);
-  icon?.(c, ppu * 0.42);
-  c.restore();
-  c.fillStyle = INK;
-  if (space.type === 'transport' || space.type === 'utility') {
-    c.font = `600 ${priceSize}px ${FONT}`;
-    c.fillText(`$${space.price}`, 0, d / 2 - priceSize * 1.0);
-  } else if (space.type === 'tax') {
-    c.font = `600 ${priceSize}px ${FONT}`;
-    c.fillText(`PAY $${space.amount}`, 0, d / 2 - priceSize * 1.0);
-  }
+  c.strokeStyle = LINE;
+  c.lineWidth = Math.max(1.5, ppu * 0.01);
+  c.strokeRect(x0, y0, w, d);
 }
 
 function drawCorner(c: CanvasRenderingContext2D, space: SpaceDef, ppu: number): void {
@@ -350,62 +370,134 @@ function drawCorner(c: CanvasRenderingContext2D, space: SpaceDef, ppu: number): 
 function drawCenter(c: CanvasRenderingContext2D, size: number, ppu: number): void {
   const inner = (BOARD - CORNER * 2) * ppu;
   const x0 = (size - inner) / 2;
-  const grad = c.createRadialGradient(size / 2, size / 2, inner * 0.05, size / 2, size / 2, inner * 0.7);
-  grad.addColorStop(0, '#F8F1E1');
-  grad.addColorStop(1, '#EADBB9');
+  const cx = size / 2;
+  const cy = size / 2;
+  const grad = c.createRadialGradient(cx, cy - inner * 0.1, inner * 0.05, cx, cy, inner * 0.72);
+  grad.addColorStop(0, '#FBF5E8');
+  grad.addColorStop(0.7, '#EFE2C6');
+  grad.addColorStop(1, '#E2D0AA');
   c.fillStyle = grad;
   c.fillRect(x0, x0, inner, inner);
+  // Inner bevel line.
+  c.strokeStyle = 'rgba(150,120,70,0.35)';
+  c.lineWidth = ppu * 0.02;
+  c.strokeRect(x0 + ppu * 0.12, x0 + ppu * 0.12, inner - ppu * 0.24, inner - ppu * 0.24);
 
-  // Decorative skyline.
-  const base = size / 2 + inner * 0.12;
-  const colors = ['#4B91D1', '#55B98A', '#EFB15E', '#E77979', '#A589CF', '#7FCBEA', '#F08C2E'];
+  // Decorative emblem ring behind the city.
+  c.strokeStyle = 'rgba(75,145,209,0.16)';
+  c.lineWidth = inner * 0.012;
+  c.beginPath();
+  c.arc(cx, cy - inner * 0.04, inner * 0.36, 0, Math.PI * 2);
+  c.stroke();
+  c.strokeStyle = 'rgba(239,177,94,0.22)';
+  c.lineWidth = inner * 0.005;
+  c.beginPath();
+  c.arc(cx, cy - inner * 0.04, inner * 0.385, 0, Math.PI * 2);
+  c.stroke();
+
+  // Park strip, trees and road below the skyline.
+  const base = cy + inner * 0.12;
+  c.fillStyle = '#9CCB8A';
+  roundRect(c, cx - inner * 0.42, base - inner * 0.004, inner * 0.84, inner * 0.045, inner * 0.02);
+  c.fill();
+  c.fillStyle = '#8A8F98';
+  c.fillRect(cx - inner * 0.44, base + inner * 0.04, inner * 0.88, inner * 0.03);
+  c.fillStyle = '#F5F0E6';
+  for (let x = cx - inner * 0.42; x < cx + inner * 0.42; x += inner * 0.05) c.fillRect(x, base + inner * 0.054, inner * 0.025, inner * 0.004);
+
+  // Skyline with soft shadows and lit windows.
+  const colors = ['#4B91D1', '#55B98A', '#EFB15E', '#E77979', '#A589CF', '#7FCBEA', '#F08C2E', '#4B91D1', '#55B98A'];
   const widths = [0.07, 0.09, 0.06, 0.11, 0.08, 0.1, 0.07, 0.09, 0.06];
   const heights = [0.18, 0.3, 0.22, 0.4, 0.26, 0.34, 0.2, 0.28, 0.16];
-  let x = size / 2 - inner * 0.37;
+  let x = cx - inner * 0.37;
   widths.forEach((w, i) => {
     const bw = w * inner;
     const bh = (heights[i] as number) * inner;
-    c.fillStyle = colors[i % colors.length] as string;
-    roundRect(c, x, base - bh, bw - inner * 0.008, bh, inner * 0.008);
+    const color = colors[i % colors.length] as string;
+    c.save();
+    c.shadowColor = 'rgba(60,40,15,0.28)';
+    c.shadowBlur = inner * 0.015;
+    c.shadowOffsetX = inner * 0.006;
+    c.shadowOffsetY = inner * 0.004;
+    c.fillStyle = color;
+    roundRect(c, x, base - bh, bw - inner * 0.01, bh, inner * 0.008);
     c.fill();
-    c.fillStyle = 'rgba(255,255,255,0.55)';
+    c.restore();
+    // Side shading for depth.
+    c.fillStyle = 'rgba(0,0,0,0.12)';
+    c.fillRect(x + bw * 0.72, base - bh + inner * 0.008, bw * 0.28 - inner * 0.01, bh - inner * 0.008);
+    // Roof cap.
+    c.fillStyle = 'rgba(255,255,255,0.35)';
+    c.fillRect(x, base - bh, bw - inner * 0.01, inner * 0.006);
     for (let wy = base - bh + inner * 0.025; wy < base - inner * 0.03; wy += inner * 0.035) {
-      for (let wx = x + inner * 0.012; wx < x + bw - inner * 0.025; wx += inner * 0.022) c.fillRect(wx, wy, inner * 0.01, inner * 0.016);
+      for (let wx = x + inner * 0.012; wx < x + bw - inner * 0.025; wx += inner * 0.022) {
+        c.fillStyle = (Math.floor(wx * 7 + wy * 3) % 5 === 0) ? 'rgba(255,236,170,0.95)' : 'rgba(255,255,255,0.6)';
+        c.fillRect(wx, wy, inner * 0.01, inner * 0.016);
+      }
     }
     x += bw;
   });
-  c.fillStyle = '#C9B892';
-  c.fillRect(size / 2 - inner * 0.4, base, inner * 0.8, inner * 0.012);
+  // Trees.
+  for (let i = 0; i < 9; i++) {
+    const tx = cx - inner * 0.4 + i * inner * 0.1;
+    c.fillStyle = '#7C5A3A';
+    c.fillRect(tx - inner * 0.003, base + inner * 0.006, inner * 0.006, inner * 0.02);
+    c.fillStyle = i % 2 ? '#3BA55C' : '#4CB36A';
+    c.beginPath();
+    c.arc(tx, base + inner * 0.002, inner * 0.016, 0, Math.PI * 2);
+    c.fill();
+  }
 
   c.textAlign = 'center';
   c.textBaseline = 'middle';
+  c.save();
+  c.shadowColor = 'rgba(37,51,68,0.25)';
+  c.shadowBlur = inner * 0.01;
+  c.shadowOffsetY = inner * 0.004;
   c.fillStyle = INK;
-  c.font = `900 ${inner * 0.085}px ${FONT}`;
-  c.fillText('PROPERTY', size / 2, size / 2 + inner * 0.2);
+  c.font = `900 ${inner * 0.09}px ${FONT}`;
+  c.fillText('PROPERTY', cx, cy + inner * 0.22);
   c.fillStyle = '#4B91D1';
-  c.fillText('EMPIRE', size / 2, size / 2 + inner * 0.29);
+  c.fillText('EMPIRE', cx, cy + inner * 0.31);
+  c.restore();
   c.fillStyle = '#6F7B88';
   c.font = `700 ${inner * 0.03}px ${FONT}`;
-  c.fillText('BUY  ·  BUILD  ·  TRADE  ·  PROSPER', size / 2, size / 2 + inner * 0.355);
+  c.fillText('BUY  ·  BUILD  ·  TRADE  ·  PROSPER', cx, cy + inner * 0.375);
 
-  // Card deck slots.
-  const deck = (cx: number, cy: number, color: string, label: string) => {
+  // Card deck trays.
+  const deck = (dx: number, dy: number, color: string, label: string, glyph: string | ((c: CanvasRenderingContext2D, s: number) => void)) => {
     c.save();
-    c.translate(cx, cy);
+    c.translate(dx, dy);
     c.rotate(-Math.PI / 4);
+    const w = inner * 0.24;
+    const h = inner * 0.145;
+    c.fillStyle = 'rgba(255,255,255,0.55)';
+    roundRect(c, -w / 2, -h / 2, w, h, inner * 0.018);
+    c.fill();
     c.strokeStyle = color;
     c.lineWidth = inner * 0.006;
     c.setLineDash([inner * 0.015, inner * 0.01]);
-    roundRect(c, -inner * 0.11, -inner * 0.065, inner * 0.22, inner * 0.13, inner * 0.015);
     c.stroke();
     c.setLineDash([]);
     c.fillStyle = color;
-    c.font = `800 ${inner * 0.028}px ${FONT}`;
-    c.fillText(label, 0, 0);
+    if (typeof glyph === 'string') {
+      c.font = `900 ${inner * 0.05}px ${FONT}`;
+      c.fillText(glyph, 0, -h * 0.12);
+    } else {
+      c.save();
+      c.translate(0, -h * 0.12);
+      glyph(c, inner * 0.06);
+      c.restore();
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillStyle = color;
+    }
+    c.font = `800 ${inner * 0.024}px ${FONT}`;
+    c.fillText(label, 0, h * 0.28);
     c.restore();
   };
-  deck(size / 2 - inner * 0.28, size / 2 - inner * 0.3, '#A589CF', 'FORTUNE');
-  deck(size / 2 + inner * 0.28, size / 2 - inner * 0.3, '#3A936A', 'COMMUNITY');
+  deck(cx - inner * 0.29, cy - inner * 0.31, '#8E6CC0', 'FORTUNE', '?');
+  deck(cx + inner * 0.29, cy - inner * 0.31, '#3A936A', 'COMMUNITY FUND', iconGift);
 }
 
 /** Paint the full board. size = canvas pixels (power of two recommended). */
@@ -419,6 +511,8 @@ export function paintBoard(board: BoardDef, size: number): HTMLCanvasElement {
   c.fillStyle = SURFACE;
   c.fillRect(0, 0, size, size);
   drawCenter(c, size, ppu);
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
   const groupColor = (g?: string) => board.groups.find((x) => x.id === g)?.color ?? '#999';
   for (const space of board.spaces) {
     const r = tileRect(space.index);
@@ -437,8 +531,18 @@ export function paintBoard(board: BoardDef, size: number): HTMLCanvasElement {
     }
     c.restore();
   }
-  c.strokeStyle = '#B9A57A';
-  c.lineWidth = ppu * 0.03;
-  c.strokeRect(0, 0, size, size);
+  // Paper grain over everything, then a double outer border.
+  const grain = paperPattern(c);
+  if (grain) {
+    c.fillStyle = grain;
+    c.fillRect(0, 0, size, size);
+  }
+  c.strokeStyle = '#8F7748';
+  c.lineWidth = ppu * 0.035;
+  c.strokeRect(ppu * 0.0175, ppu * 0.0175, size - ppu * 0.035, size - ppu * 0.035);
+  const inner = CORNER * ppu;
+  c.strokeStyle = 'rgba(143,119,72,0.6)';
+  c.lineWidth = ppu * 0.015;
+  c.strokeRect(inner, inner, size - inner * 2, size - inner * 2);
   return canvas;
 }

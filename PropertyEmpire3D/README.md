@@ -6,7 +6,7 @@ Everything here is original: board names, card texts, artwork (drawn procedurall
 
 ## Features
 
-- **3D board in the browser** (Three.js/WebGL): 40 labeled spaces painted procedurally, low-poly tokens, houses and hotels, animated dice, ownership strips, mortgage dimming, selection and build highlights.
+- **3D board in the browser** (Three.js/WebGL): a wooden tabletop and walnut board frame, 40 labeled spaces painted procedurally at up to 4096 px, glossy turned tokens, houses and hotels with roofs and windows, rounded dice, soft shadows and image-based reflections, ownership strips, mortgage dimming, selection and build highlights. Everything is generated in code, with no image or model downloads.
 - **Complete rules**: dice and doubles, three-doubles-to-Jail, GO salary, purchases and round-robin auctions, rent (color-group doubling, buildings, transit and utilities), even building with a limited Bank stock (32 houses / 12 hotels), selling buildings, mortgages with 10% interest, two 16-card decks, Get Out of Jail Free cards, trading with counteroffers, debt resolution, bankruptcy to players or the Bank (with auctions), winner detection, optional round limit and Free Parking jackpot.
 - **Bots**: Easy, Medium and Hard heuristic bots that buy, bid, build, mortgage, trade, manage debt and get out of Jail. Fully offline, deterministic in tests, always legal (with a safe fallback).
 - **LAN multiplayer**: an authoritative Node.js WebSocket room server. Join by 5-letter room code, invite link or manual server address. Mixed humans and bots, reconnect with a session token, autopilot for disconnected players, host-side saves.
@@ -130,6 +130,7 @@ See [TESTING.md](TESTING.md) and [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 | `npm install` fails with `edgesOut` | Use the provided `.npmrc` (`legacy-peer-deps=true`) or run `npm install --legacy-peer-deps`. |
 | Black or missing board | Enable hardware acceleration / WebGL in the browser, or set *Graphics quality* to Low. |
 | Page served over HTTPS cannot connect | HTTPS pages must use `wss://`. Put the server behind a TLS reverse proxy (see BUILD.md) and allow its origin with `PE_ALLOWED_ORIGINS`. |
+| Graphics look blurry or jagged | Settings → Graphics quality High (desktop) or Medium (phone), Render pixel density Auto or 2x. Make sure the browser has hardware acceleration turned on. |
 | Game feels slow on an old phone | Settings → Graphics quality Low, Render pixel density 1x, Animation speed Fast or Reduced motion. |
 | Port already in use | `PE_PORT=4000 npm run start:lan` (and use that port in the address). |
 

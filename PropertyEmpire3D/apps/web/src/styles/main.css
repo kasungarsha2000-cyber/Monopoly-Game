@@ -972,6 +972,17 @@ input[type='checkbox'] {
   font-size: 13px;
 }
 
+/* Auction controls */
+.bid-quick {
+  margin-bottom: 8px;
+}
+
+.bid-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* Property card */
 .prop-card {
   border: 1px solid var(--line);
@@ -1525,10 +1536,12 @@ input[type='checkbox'] {
     margin: 4px 0 8px;
     font-size: 13px;
   }
-  /* Compact card in the bottom sheet: tap the tile for the full rent table. */
-  .action-panel .prop-card table,
-  .action-panel .prop-card .body > p {
+  /* Compact card in the bottom sheet: tap the tile for the full details. */
+  .action-panel .prop-card .body {
     display: none;
+  }
+  .action-panel .prop-card {
+    margin-bottom: 8px;
   }
   .action-panel .prop-card .band {
     padding: 8px 12px;
@@ -1543,6 +1556,21 @@ input[type='checkbox'] {
   }
   .action-panel .actions > .btn {
     flex: 1 1 40%;
+  }
+  .action-panel .bidders,
+  .action-panel .bid-hint {
+    display: none;
+  }
+  .bid-quick .btn {
+    flex: 1;
+    min-height: 34px;
+  }
+  .bid-row {
+    flex-direction: row;
+  }
+  .bid-row .input {
+    flex: 1;
+    min-width: 0;
   }
   .bottombar {
     left: 8px;

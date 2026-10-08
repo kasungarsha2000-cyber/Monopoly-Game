@@ -43,6 +43,8 @@ Head-to-head (60 two-player games per pairing, both seat orders): medium beats e
 | Reduced-motion card popups swallowed taps on the board | mobile browser test | Non-blocking popups are click-through |
 | A player removed from a lobby automatically rejoined as a new seat | code review | Server close codes 4000-4099 stop client auto-reconnect |
 | Results dialog showed "Round 31 / 30" and stale overlays | screenshot review | Round display capped; overlays cleared when results open |
+| Graphics looked poor, especially on phones (Low preset forced: 1x pixels, no anti-aliasing, 1024 px board) | user report | New presets and defaults (see BUILD_STATUS), settings migration, 4096 px board art, wood table/frame, glossy lathe tokens, detailed buildings, rounded dice, image-based lighting, visible soft shadows, tighter phone framing |
+| Directional shadows were invisible (washed out by ambient light) | debugging with ambient light disabled | Rebalanced key, fill, hemisphere and environment light |
 
 ## Verified behaviors (automated)
 

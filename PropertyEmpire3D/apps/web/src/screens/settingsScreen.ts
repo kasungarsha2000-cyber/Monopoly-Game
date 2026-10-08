@@ -63,7 +63,7 @@ export function settingsForm(): HTMLElement {
         (v) => settings.update({ graphicsQuality: v }),
         'Graphics quality'
       ),
-      'Low turns off shadows and anti-aliasing (anti-aliasing changes apply after reload).'
+      'High: sharpest board, soft shadows and glossy reflections. Low: no shadow maps, for older devices.'
     ),
     row(
       'Render pixel density',
@@ -84,7 +84,7 @@ export function settingsForm(): HTMLElement {
     check('invertCamera', 'Invert camera drag'),
     check('reducedMotion', 'Reduced motion', 'Skips token, dice and camera animations.'),
     check('confirmDestructive', 'Confirm risky actions', 'Ask before bankruptcy, quitting or selling buildings.'),
-    check('mobilePreset', 'Mobile graphics preset', isMobileDevice() ? 'This device looks like a phone: low graphics are used by default.' : 'Use low graphics automatically on phones.'),
+    check('mobilePreset', 'Mobile graphics preset', isMobileDevice() ? 'This device looks like a phone: High is capped to Medium to save battery.' : 'Cap graphics at Medium on phones to save battery.'),
     row('Full screen', h('div', {}, fs))
   );
 }
