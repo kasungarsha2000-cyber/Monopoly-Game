@@ -11,7 +11,8 @@ Recorded 2026-10-08 in a headless Linux container (Node v22.22.0, Chromium 1194 
 | Bot tests | `npx vitest run packages/game-core/tests/bots.test.ts` | 15 / 15 pass |
 | Network integration tests | `npx vitest run tests/network` | 12 / 12 pass |
 | All Vitest | `npm test` | 78 / 78 pass (about 6 s) |
-| Browser tests | `npm run test:e2e` | 12 / 12 pass after the layout redesign (8 min). The earlier `--repeat-each=2` run (24 / 24) predates the redesign. |
+| Browser tests | `npm run test:e2e` | 13 / 13 pass (9 min), including the Android app page test. The earlier `--repeat-each=2` run (24 / 24) predates the redesign. |
+| Android APK | `npm run build:android`, `aapt dump badging`, `apksigner verify` | Builds and verifies (v2+v3); manifest, launcher activity, icons, dex classes and the game page checked. Not run on a device or emulator (see BLOCKERS). |
 | Bot-only stress run | `npm run simulate -- 30 <n>` for n = 2, 3, 4, 6, 8 | 150 / 150 matches finished, 0 invariant violations, 0 fallback actions |
 
 ## Bot stress run detail

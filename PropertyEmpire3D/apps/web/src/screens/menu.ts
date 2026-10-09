@@ -9,6 +9,7 @@ import { settingsScreen } from './settingsScreen';
 import { howToScreen } from './howto';
 import { hasSaves } from '../storage';
 import { loadLanSession } from '../session/LanClient';
+import { androidApp } from '../platform';
 
 let demoState: GameState | null = null;
 
@@ -63,7 +64,8 @@ export function menuScreen(app: App): () => void {
   void hasSaves().then((has) => {
     if (has || loadLanSession()) continueBtn.disabled = false;
   });
-  const fsBtn = document.fullscreenEnabled
+  // The Android app is always full screen.
+  const fsBtn = document.fullscreenEnabled && !androidApp
     ? button(
         'Fullscreen',
         () => {
@@ -86,7 +88,13 @@ export function menuScreen(app: App): () => void {
       button('Create LAN Game', () => app.show(lanCreateScreen), { block: true, testid: 'menu-create-lan', disabled: standalone }),
       button('Join LAN Game', () => app.show(joinScreen), { block: true, testid: 'menu-join-lan', disabled: standalone }),
       standalone
-        ? h('p', { class: 'muted small-text', style: 'margin:0;text-align:center' }, 'LAN games need the host server. Run "npm run start:lan" on a computer on your Wi-Fi and open the address it prints.')
+        ? h(
+            'p',
+            { class: 'muted small-text', style: 'margin:0;text-align:center' },
+            androidApp
+              ? 'This app plays solo against bots, fully offline. For LAN games, run "npm run start:lan" on a computer and open the address it prints in a browser.'
+              : 'LAN games need the host server. Run "npm run start:lan" on a computer on your Wi-Fi and open the address it prints.'
+          )
         : null,
       continueBtn
     ),

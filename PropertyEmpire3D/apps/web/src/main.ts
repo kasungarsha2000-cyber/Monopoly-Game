@@ -7,7 +7,8 @@ import './styles/main.css';
 import { App } from './app';
 import { settings } from './settings';
 import { audio } from './audio';
-import { h } from './ui/dom';
+import { closeTopModal, h } from './ui/dom';
+import { APP_PAUSE, APP_RESUME } from './platform';
 import { logo } from './screens/common';
 import { menuScreen } from './screens/menu';
 import { joinScreen } from './screens/lan';
@@ -40,6 +41,23 @@ function boot(): void {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);
     });
   }
+
+  // Hooks for the Android wrapper: the system back button and app pause/resume.
+  const hooks = window as unknown as Record<string, unknown>;
+  hooks.peHandleBack = (): boolean => {
+    if (closeTopModal()) return true;
+    if (app.backHandler) {
+      app.backHandler();
+      return true;
+    }
+    if (app.current && app.current !== menuScreen) {
+      app.show(menuScreen);
+      return true;
+    }
+    return false; // on the main menu: let the app close
+  };
+  hooks.peOnPause = () => window.dispatchEvent(new Event(APP_PAUSE));
+  hooks.peOnResume = () => window.dispatchEvent(new Event(APP_RESUME));
 
   window.addEventListener('error', (e) => console.error('[property-empire]', e.message));
   window.addEventListener('unhandledrejection', (e) => console.error('[property-empire] unhandled', e.reason));

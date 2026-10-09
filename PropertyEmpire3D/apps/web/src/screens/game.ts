@@ -39,6 +39,7 @@ import { settingsForm } from './settingsScreen';
 import { howToContent } from './howto';
 import { menuScreen } from './menu';
 import { wait } from '../three/tween';
+import { androidApp } from '../platform';
 
 export interface GameScreenOptions {
   lan?: LanClient;
@@ -195,10 +196,12 @@ class GameView {
       { class: 'gs-footer' },
       h('span', {}, 'Made for game night.'),
       h('span', { class: 'keys' }, 'Space roll · E end turn · P properties · T trade · L log'),
-      h('span', {}, isLan ? (session.isHost ? 'Saved on this computer while you host.' : 'Saved by the host.') : 'Saved automatically in this browser.')
+      h('span', {}, isLan ? (session.isHost ? 'Saved on this computer while you host.' : 'Saved by the host.') : androidApp ? 'Saved automatically on this device.' : 'Saved automatically in this browser.')
     );
 
     this.shell.append(header, empire, actions, this.boardCard, this.deedPanel, footer);
+    // Android back button: open the pause menu (a second press closes it).
+    app.backHandler = () => this.openMenu();
     const myColor = this.player(this.me)?.color;
     if (myColor && /^#[0-9a-f]{3,8}$/i.test(myColor)) this.shell.style.setProperty('--me', myColor);
     app.root.append(this.shell);

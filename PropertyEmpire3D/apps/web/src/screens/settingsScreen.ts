@@ -4,6 +4,7 @@ import { audio } from '../audio';
 import { h, segmented } from '../ui/dom';
 import { backHeader } from './common';
 import { menuScreen } from './menu';
+import { androidApp } from '../platform';
 
 /** Settings controls; reused by the in-game settings dialog. */
 export function settingsForm(): HTMLElement {
@@ -85,7 +86,7 @@ export function settingsForm(): HTMLElement {
     check('reducedMotion', 'Reduced motion', 'Skips token, dice and camera animations.'),
     check('confirmDestructive', 'Confirm risky actions', 'Ask before bankruptcy, quitting or selling buildings.'),
     check('mobilePreset', 'Mobile graphics preset', isMobileDevice() ? 'This device looks like a phone: High is capped to Medium to save battery.' : 'Cap graphics at Medium on phones to save battery.'),
-    row('Full screen', h('div', {}, fs))
+    androidApp ? null : row('Full screen', h('div', {}, fs))
   );
 }
 

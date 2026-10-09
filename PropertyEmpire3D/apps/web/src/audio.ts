@@ -3,6 +3,7 @@
  * are no audio assets to download or license. Music is a soft generative pad.
  */
 import { settings } from './settings';
+import { APP_PAUSE, APP_RESUME } from './platform';
 
 export type Sfx = 'click' | 'dice' | 'step' | 'coin' | 'pay' | 'buy' | 'build' | 'jail' | 'card' | 'turn' | 'win' | 'error' | 'bankrupt' | 'auction';
 
@@ -47,6 +48,8 @@ class AudioManager {
       if (document.hidden) void this.ctx?.suspend();
       else void this.ctx?.resume();
     });
+    window.addEventListener(APP_PAUSE, () => void this.ctx?.suspend());
+    window.addEventListener(APP_RESUME, () => void this.ctx?.resume());
     this.startMusic();
   }
 

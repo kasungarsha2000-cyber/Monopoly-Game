@@ -1,6 +1,6 @@
 # Property Empire 3D
 
-A friendly, Monopoly-inspired 3D property trading board game that runs in any modern browser on desktop or phone. Play solo against offline bots, or host a game on your home Wi-Fi or phone hotspot so friends can join from their own browsers. No accounts, no cloud services, no installs for players.
+A friendly, Monopoly-inspired 3D property trading board game that runs in any modern browser on desktop or phone, and as an **Android app**. Play solo against offline bots, or host a game on your home Wi-Fi or phone hotspot so friends can join from their own browsers. No accounts, no cloud services.
 
 Everything here is original: board names, card texts, artwork (drawn procedurally at runtime), tokens and branding. The only third-party assets are two open-source typefaces, Outfit and Figtree (SIL Open Font License), bundled from npm. The rules are classic-inspired and configurable.
 
@@ -63,6 +63,25 @@ npm start            # serves the game at http://localhost:3001/
 Solo games run the shared rules engine and bots inside your browser; no WebSocket or game server is involved after the page has loaded.
 
 To get the solo game as **one self-contained HTML file** (for example to host it as a single page), run `npm run build:artifact -- path/to/output.html`. That page has LAN play turned off because there is no host server behind it. On `localhost` or HTTPS the app also installs a small service worker so solo play keeps working offline after the first visit.
+
+## Android app
+
+`apps/android` packages the same game as a native Android app (APK): its own launcher icon, full screen, fully offline, saves kept on the phone. The app hosts the single-file game in Android's built-in WebView, served from inside the APK. The Android back button closes dialogs, opens the pause menu during a game and exits from the main menu. The app plays solo against bots; LAN games are hosted from a computer and played in browsers.
+
+**Install on a phone (Android 7.0 or newer):**
+
+1. Copy `property-empire-3d.apk` to the phone (or download it there).
+2. Open it. Android asks you to allow installs from that app (for example *Files* or *Chrome*): allow it, then tap **Install**.
+3. Open **Property Empire 3D** from the app drawer.
+
+**Build the APK:**
+
+```bash
+npm run build:android            # -> apps/android/build/property-empire-3d.apk
+npm run build:android -- out.apk # also copy it to out.apk
+```
+
+The build needs a JDK (11 or newer) and these Android SDK pieces: a platform `android.jar`, `aapt`, `zipalign`, `apksigner` and `d8` (or the older `dx`). It uses Android Studio's SDK when `ANDROID_HOME` is set. On Debian/Ubuntu, `sudo apt-get install android-sdk-platform-23 aapt dalvik-exchange apksigner zipalign` is enough. The first build creates a debug signing key in `apps/android/.keystore/`. Keep that file: Android only installs an update over an existing copy (and its saves) when both are signed with the same key. Set `PE_ANDROID_KEYSTORE`, `PE_ANDROID_KEYSTORE_PASS`, `PE_ANDROID_KEY_ALIAS` and `PE_ANDROID_KEY_PASS` to sign with your own key. See [BUILD.md](BUILD.md#android-app) for publishing notes.
 
 ## How to host a Wi-Fi browser game with Node
 
@@ -143,6 +162,7 @@ See [TESTING.md](TESTING.md) and [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 packages/game-core   Pure TypeScript rules engine, data (board/cards/rules JSON), bots, protocol
 apps/server          Node.js + ws authoritative LAN room server (bundled to dist/index.js)
 apps/web             Vite + TypeScript + Three.js browser client
+apps/android         Android app: manifest, MainActivity (WebView host), icons; built by scripts/build-android.mjs
 tests/network        WebSocket integration tests (Vitest)
 tests/e2e            Playwright browser tests
 docs/                Progress, build status, test results, blockers, next steps

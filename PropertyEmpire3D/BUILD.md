@@ -83,6 +83,30 @@ location / {
 
 Then start the server with `PE_ALLOWED_ORIGINS=https://game.example.lan npm start`. Keep it on a trusted network: the server has no accounts, and a random room code is not authentication.
 
+## Android app
+
+`npm run build:android` (script: `scripts/build-android.mjs`) produces `apps/android/build/property-empire-3d.apk`:
+
+1. `scripts/build-artifact.mjs --document` writes the single-file game page to `apps/android/assets/www/index.html` (git-ignored build output).
+2. `aapt` packages `AndroidManifest.xml`, `res/` and `assets/`; `javac` compiles `MainActivity.java` against the platform `android.jar`; `d8` (or `dx`) converts it to `classes.dex`.
+3. `zipalign` aligns the APK and `apksigner` signs it (v2/v3 signatures) with the debug key in `apps/android/.keystore/` or the key named by `PE_ANDROID_KEYSTORE`.
+
+How the app works (`apps/android/java/app/propertyempire3d/MainActivity.java`):
+
+- One activity with a full-screen WebView in immersive mode. The screen stays on while the app is open. Rotation is handled without reloading the page.
+- `assets/www` is served for `https://appassets.androidplatform.net/` (a host reserved for in-app content) via `shouldInterceptRequest`. The page therefore gets a secure origin for IndexedDB saves and WebGL, while file access stays off.
+- The page is served with a Content-Security-Policy that allows only its own inline code: no fetch, XHR or WebSocket. Links to anything else open outside the app.
+- A `PEAndroid` JavaScript bridge marks app mode (no fullscreen button, offline note). `window.peHandleBack()` handles the back button. `window.peOnPause()` and `window.peOnResume()` autosave and pause audio when the app goes to the background.
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Package | `app.propertyempire3d` | |
+| minSdkVersion | 24 (Android 7.0) | modern WebView with WebGL and ES2022 |
+| targetSdkVersion | 34 | sideload-friendly on Android 14/15 without forced edge-to-edge |
+| Compile platform | whatever SDK is found; 23 with Debian's packages | the code only uses APIs that exist on every supported version |
+
+Publishing on Google Play needs more than this build: Play requires a recent target SDK (35 or newer at the time of writing) and an app bundle (`.aab`) signed with your upload key. Do it with Android Studio's SDK: raise `targetSdkVersion`, check edge-to-edge insets on Android 15, then build and sign with your release key.
+
 ## Static-only solo hosting
 
 `apps/web/dist` can be copied to any static web host. Solo play works there; LAN features need the Node server reachable from the players' devices.

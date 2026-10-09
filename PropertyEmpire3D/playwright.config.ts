@@ -27,7 +27,7 @@ export default defineConfig({
     env: { PE_BOT_DELAY_MS: '120', PE_SAVE_DIR: 'test-results/e2e-saves' }
   },
   projects: [
-    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 820 } }, testIgnore: /mobile\.spec/ },
-    { name: 'mobile-chromium', use: { ...devices['Pixel 7'] }, testMatch: /mobile\.spec/ }
+    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 820 } }, testIgnore: /(mobile|android)\.spec/ },
+    { name: 'mobile-chromium', use: { ...devices['Pixel 7'] }, testMatch: /(mobile|android)\.spec/ }
   ]
 });

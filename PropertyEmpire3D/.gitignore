@@ -14,3 +14,7 @@ coverage/
 .DS_Store
 apps/web/dist-standalone/
 artifact/
+apps/android/build/
+apps/android/assets/
+apps/android/.keystore/
+*.apk

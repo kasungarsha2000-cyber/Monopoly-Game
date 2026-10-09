@@ -7,6 +7,7 @@ import { applyAction, BotDriver, type Action, type GameEvent, type GameState } f
 import { saveGame } from '../storage';
 import { settings } from '../settings';
 import { Emitter, type GameSession, type GameUpdate } from './types';
+import { APP_PAUSE } from '../platform';
 
 const AUTOSAVE_EVENTS = new Set(['TURN_ENDED', 'PROPERTY_BOUGHT', 'AUCTION_WON', 'TRADE_ACCEPTED', 'BANKRUPT', 'GAME_OVER', 'BUILT', 'MORTGAGED', 'UNMORTGAGED']);
 
@@ -24,6 +25,7 @@ export class LocalSession implements GameSession {
   private visibilityHandler = () => {
     if (document.visibilityState === 'hidden') this.autosaveNow();
   };
+  private appPauseHandler = () => this.autosaveNow();
 
   constructor(
     state: GameState,
@@ -34,6 +36,7 @@ export class LocalSession implements GameSession {
     this.current = state;
     this.driver = new BotDriver({ seed: botSeed, debug: new URLSearchParams(location.search).has('botdebug') });
     document.addEventListener('visibilitychange', this.visibilityHandler);
+    window.addEventListener(APP_PAUSE, this.appPauseHandler);
     this.autosaveNow();
   }
 
@@ -139,5 +142,6 @@ export class LocalSession implements GameSession {
       this.autosaveNow();
     }
     document.removeEventListener('visibilitychange', this.visibilityHandler);
+    window.removeEventListener(APP_PAUSE, this.appPauseHandler);
   }
 }

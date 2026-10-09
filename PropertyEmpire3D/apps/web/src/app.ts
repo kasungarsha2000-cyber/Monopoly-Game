@@ -16,6 +16,10 @@ export class App {
   readonly stage: HTMLElement;
   renderer: BoardRenderer | null = null;
   rendererError: string | null = null;
+  /** The screen on show (used by the Android back button). */
+  current: Screen | null = null;
+  /** Optional back-button action for the current screen; cleared on every screen change. */
+  backHandler: (() => void) | null = null;
   private cleanup: Cleanup = undefined;
   /** Test mode (?e2e=1): instant animations and fast bots. */
   readonly e2e: boolean;
@@ -52,8 +56,10 @@ export class App {
   show(screen: Screen): void {
     if (typeof this.cleanup === 'function') this.cleanup();
     this.cleanup = undefined;
+    this.backHandler = null;
     closeAllModals();
     clear(this.root);
+    this.current = screen;
     this.cleanup = screen(this);
   }
 
